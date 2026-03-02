@@ -1,0 +1,12 @@
+{
+  "appName": "Assistant",
+  "appId": "assistant",
+  "contactEmail": "",
+  "updateApiUrlTest": "",
+  "updateApiUrlProd": "",
+  "downloadPageUrl": "",
+  "userManualUrl": "",
+  "agentName": "Assistant",
+  "copyright": "",
+  "description": "A personal AI assistant"
+}

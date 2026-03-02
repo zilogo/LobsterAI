@@ -1,3 +1,5 @@
-export const APP_NAME = 'LobsterAI';
-export const APP_ID = 'lobsterai';
-export const DB_FILENAME = 'lobsterai.sqlite';
+import brandConfig from '../../brand.config.json';
+
+export const APP_NAME = brandConfig.appName;
+export const APP_ID = brandConfig.appId;
+export const DB_FILENAME = `${brandConfig.appId}.sqlite`;

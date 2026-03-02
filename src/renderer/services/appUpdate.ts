@@ -91,6 +91,10 @@ const getPlatformDownloadUrl = (value: UpdateValue | undefined): string => {
 };
 
 export const checkForAppUpdate = async (currentVersion: string): Promise<AppUpdateInfo | null> => {
+  if (!UPDATE_CHECK_URL) {
+    return null;
+  }
+
   const response = await window.electron.api.fetch({
     url: getUpdateCheckUrl(),
     method: 'GET',

@@ -7,7 +7,8 @@ import { themeService } from '../services/theme';
 import { i18nService, LanguageType } from '../services/i18n';
 import { decryptSecret, encryptWithPassword, decryptWithPassword, EncryptedPayload, PasswordEncryptedPayload } from '../services/encryption';
 import { coworkService } from '../services/cowork';
-import { APP_ID, EXPORT_FORMAT_TYPE, EXPORT_PASSWORD } from '../constants/app';
+import { imService } from '../services/im';
+import { APP_ID, APP_NAME, EXPORT_FORMAT_TYPE, EXPORT_PASSWORD } from '../constants/app';
 import ErrorMessage from './ErrorMessage';
 import { XMarkIcon, Cog6ToothIcon, SignalIcon, CheckCircleIcon, XCircleIcon, CubeIcon, ChatBubbleLeftIcon, ShieldCheckIcon, EnvelopeIcon, InformationCircleIcon } from '@heroicons/react/24/outline';
 import { EyeIcon, EyeSlashIcon, XCircleIcon as XCircleIconSolid } from '@heroicons/react/20/solid';
@@ -196,9 +197,9 @@ const normalizeBaseUrl = (baseUrl: string): string => baseUrl.trim().replace(/\/
 const normalizeApiFormat = (value: unknown): 'anthropic' | 'openai' => (
   value === 'openai' ? 'openai' : 'anthropic'
 );
-const ABOUT_CONTACT_EMAIL = 'lobsterai.project@rd.netease.com';
-const ABOUT_USER_MANUAL_URL = 'https://lobsterai.youdao.com/#/docs/lobsterai_user_manual';
-const ABOUT_SERVICE_TERMS_URL = 'https://c.youdao.com/dict/hardware/lobsterai/lobsterai_service.html';
+const ABOUT_CONTACT_EMAIL = '';
+const ABOUT_USER_MANUAL_URL = '';
+const ABOUT_SERVICE_TERMS_URL = '';
 
 const copyTextFallback = (text: string): boolean => {
   const textarea = document.createElement('textarea');
@@ -2820,7 +2821,7 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, onUpda
             {/* Logo & App Name */}
             <img
               src="logo.png"
-              alt="LobsterAI"
+              alt={APP_NAME}
               className="w-16 h-16 mb-3 cursor-pointer select-none"
               onClick={() => {
                 const next = logoClickCount + 1;
@@ -2830,7 +2831,7 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, onUpda
                 }
               }}
             />
-            <h3 className="text-lg font-semibold dark:text-claude-darkText text-claude-text">LobsterAI</h3>
+            <h3 className="text-lg font-semibold dark:text-claude-darkText text-claude-text">{APP_NAME}</h3>
             <span className="text-xs dark:text-claude-darkTextSecondary text-claude-textSecondary mt-1">v{appVersion}</span>
 
             {/* Info Card */}
@@ -2855,25 +2856,42 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, onUpda
                   </button>
                 </div>
               </div>
-              <div className="flex items-center justify-between px-4 py-3 border-b border-claude-border dark:border-claude-darkBorder">
-                <span className="text-sm dark:text-claude-darkText text-claude-text">{i18nService.t('aboutContactEmail')}</span>
-                <div className="flex items-center gap-2">
+              {ABOUT_CONTACT_EMAIL && (
+                <div className="flex items-center justify-between px-4 py-3 border-b border-claude-border dark:border-claude-darkBorder">
+                  <span className="text-sm dark:text-claude-darkText text-claude-text">{i18nService.t('aboutContactEmail')}</span>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        void handleCopyContactEmail();
+                      }}
+                      title={i18nService.t('copyToClipboard')}
+                      className="text-sm dark:text-claude-darkTextSecondary text-claude-textSecondary bg-transparent border-none appearance-none p-0 m-0 cursor-pointer focus:outline-none"
+                    >
+                      {ABOUT_CONTACT_EMAIL}
+                    </button>
+                    {emailCopied && (
+                      <span className="text-[11px] leading-4 text-emerald-600 dark:text-emerald-400">
+                        {language === 'zh' ? '已复制' : 'Copied'}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )}
+              {ABOUT_USER_MANUAL_URL && (
+                <div className="flex items-center justify-between px-4 py-3">
+                  <span className="text-sm dark:text-claude-darkText text-claude-text">{i18nService.t('aboutUserManual')}</span>
                   <button
                     type="button"
                     onClick={(e) => {
                       e.stopPropagation();
-                      void handleCopyContactEmail();
+                      handleOpenUserManual();
                     }}
-                    title={i18nService.t('copyToClipboard')}
-                    className="text-sm dark:text-claude-darkTextSecondary text-claude-textSecondary bg-transparent border-none appearance-none p-0 m-0 cursor-pointer focus:outline-none"
+                    className="text-sm dark:text-claude-darkTextSecondary text-claude-textSecondary hover:text-claude-accent dark:hover:text-claude-accent bg-transparent border-none appearance-none px-1.5 py-0.5 -mx-1.5 -my-0.5 rounded-md cursor-pointer focus:outline-none dark:hover:bg-claude-darkSurfaceHover hover:bg-claude-surfaceHover transition-colors"
                   >
-                    {ABOUT_CONTACT_EMAIL}
+                    {ABOUT_USER_MANUAL_URL}
                   </button>
-                  {emailCopied && (
-                    <span className="text-[11px] leading-4 text-emerald-600 dark:text-emerald-400">
-                      {language === 'zh' ? '已复制' : 'Copied'}
-                    </span>
-                  )}
                 </div>
               </div>
               <div className={`flex items-center justify-between px-4 py-3${testModeUnlocked ? ' border-b border-claude-border dark:border-claude-darkBorder' : ''}`}>
@@ -2914,17 +2932,21 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, onUpda
             {/* Footer */}
             <div className="mt-auto w-full pt-14 pb-2 flex flex-col items-center">
               <div className="flex items-center justify-center text-sm dark:text-claude-darkTextSecondary text-claude-textSecondary">
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleOpenServiceTerms();
-                  }}
-                  className="bg-transparent border-none appearance-none px-1.5 py-0.5 -mx-1.5 -my-0.5 rounded-md cursor-pointer hover:text-claude-accent dark:hover:text-claude-accent transition-colors"
-                >
-                  {i18nService.t('aboutServiceTerms')}
-                </button>
-                <span className="mx-3 text-xs opacity-40">|</span>
+                {ABOUT_SERVICE_TERMS_URL && (
+                  <>
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleOpenServiceTerms();
+                      }}
+                      className="bg-transparent border-none appearance-none px-1.5 py-0.5 -mx-1.5 -my-0.5 rounded-md cursor-pointer hover:text-claude-accent dark:hover:text-claude-accent transition-colors"
+                    >
+                      {i18nService.t('aboutServiceTerms')}
+                    </button>
+                    <span className="mx-3 text-xs opacity-40">|</span>
+                  </>
+                )}
                 <button
                   type="button"
                   onClick={(e) => {
@@ -2939,10 +2961,7 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, onUpda
               </div>
 
               <p className="mt-5 text-xs dark:text-claude-darkTextSecondary text-claude-textSecondary">
-                {language === 'zh' ? '网易有道 版权所有' : 'NetEase Youdao. All rights reserved.'}
-              </p>
-              <p className="mt-1 text-xs dark:text-claude-darkTextSecondary text-claude-textSecondary">
-                Copyright &copy; {new Date().getFullYear()} NetEase Youdao. All Rights Reserved.
+                &copy; {new Date().getFullYear()}
               </p>
             </div>
           </div>

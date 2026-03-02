@@ -1,4 +1,5 @@
 import { configService } from './config';
+import { APP_NAME } from '../constants/app';
 
 // 支持的语言类型
 export type LanguageType = 'zh' | 'en';
@@ -218,9 +219,9 @@ const translations: Record<LanguageType, Record<string, string>> = {
     apiKeyNotConfigured: 'API密钥未配置。请在设置中设置您的API密钥。',
 
     // LobsterAI
-    cowork: 'LobsterAI',
+    cowork: APP_NAME,
     coworkSandbox: '沙箱',
-    coworkSettings: 'LobsterAI 设置',
+    coworkSettings: `${APP_NAME} 设置`,
     coworkHistory: '任务记录',
     coworkNoSessions: '暂无任务记录',
     coworkPinSession: '置顶任务',
@@ -229,13 +230,13 @@ const translations: Record<LanguageType, Record<string, string>> = {
     coworkPlaceholder: '分配一个任务或提问任何问题',
     coworkWorkingDirectory: '工作目录',
     coworkWorkingDirectoryPlaceholder: '输入项目路径',
-    coworkWorkingDirectoryHint: 'LobsterAI 将在此目录下执行命令',
+    coworkWorkingDirectoryHint: `${APP_NAME} 将在此目录下执行命令`,
     coworkSystemPrompt: '系统提示词',
-    coworkSystemPromptPlaceholder: '为 LobsterAI 设置自定义指令...',
-    coworkSystemPromptHint: '可选的系统提示词，用于自定义 LobsterAI 的行为',
+    coworkSystemPromptPlaceholder: `为 ${APP_NAME} 设置自定义指令...`,
+    coworkSystemPromptHint: `可选的系统提示词，用于自定义 ${APP_NAME} 的行为`,
     coworkModelSettingsRequired: '请先在模型设置中配置可用模型与 API Key。',
     coworkModelSettingsTitle: '模型设置',
-    coworkModelSettingsHint: 'LobsterAI 使用模型设置中的当前模型与提供商配置。',
+    coworkModelSettingsHint: `${APP_NAME} 使用模型设置中的当前模型与提供商配置。`,
     coworkModelSettingsAction: '前往模型设置',
     coworkApiConfigTitle: 'API 配置',
     coworkApiConfigHint: '支持 Anthropic 兼容与 OpenAI 兼容协议（OpenAI 兼容通过本地转换服务接入）。',
@@ -339,7 +340,7 @@ const translations: Record<LanguageType, Record<string, string>> = {
     coworkStatusCompleted: '已完成',
     coworkStatusError: '错误',
     coworkPermissionRequired: '需要权限确认',
-    coworkPermissionDescription: 'LobsterAI 请求执行以下操作',
+    coworkPermissionDescription: `${APP_NAME} 请求执行以下操作`,
     coworkToolName: '工具名称',
     coworkToolInput: '工具参数',
     coworkToolResult: '执行结果',
@@ -994,9 +995,9 @@ const translations: Record<LanguageType, Record<string, string>> = {
     apiKeyNotConfigured: 'API key not configured. Please set up your API key in settings.',
 
     // LobsterAI
-    cowork: 'LobsterAI',
+    cowork: APP_NAME,
     coworkSandbox: 'Sandbox',
-    coworkSettings: 'LobsterAI Settings',
+    coworkSettings: `${APP_NAME} Settings`,
     coworkHistory: 'Task History',
     coworkNoSessions: 'No tasks yet',
     coworkPinSession: 'Pin task',
@@ -1005,13 +1006,13 @@ const translations: Record<LanguageType, Record<string, string>> = {
     coworkPlaceholder: 'Assign a task or ask any question',
     coworkWorkingDirectory: 'Working Directory',
     coworkWorkingDirectoryPlaceholder: 'Enter project path',
-    coworkWorkingDirectoryHint: 'LobsterAI will execute commands in this directory',
+    coworkWorkingDirectoryHint: `${APP_NAME} will execute commands in this directory`,
     coworkSystemPrompt: 'System Prompt',
-    coworkSystemPromptPlaceholder: 'Set custom instructions for LobsterAI...',
-    coworkSystemPromptHint: 'Optional system prompt to customize LobsterAI\'s behavior',
+    coworkSystemPromptPlaceholder: `Set custom instructions for ${APP_NAME}...`,
+    coworkSystemPromptHint: `Optional system prompt to customize ${APP_NAME}'s behavior`,
     coworkModelSettingsRequired: 'Please configure models and API keys in Model Settings first.',
     coworkModelSettingsTitle: 'Model Settings',
-    coworkModelSettingsHint: 'LobsterAI uses the current model and provider configuration from Model Settings.',
+    coworkModelSettingsHint: `${APP_NAME} uses the current model and provider configuration from Model Settings.`,
     coworkModelSettingsAction: 'Go to Model Settings',
     coworkApiConfigTitle: 'API Configuration',
     coworkApiConfigHint: 'Supports Anthropic-compatible and OpenAI-compatible APIs (OpenAI compatibility is bridged by a local adapter).',
@@ -1115,7 +1116,7 @@ const translations: Record<LanguageType, Record<string, string>> = {
     coworkStatusCompleted: 'Completed',
     coworkStatusError: 'Error',
     coworkPermissionRequired: 'Permission Required',
-    coworkPermissionDescription: 'LobsterAI is requesting to perform the following action',
+    coworkPermissionDescription: `${APP_NAME} is requesting to perform the following action`,
     coworkToolName: 'Tool Name',
     coworkToolInput: 'Tool Input',
     coworkToolResult: 'Result',

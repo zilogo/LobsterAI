@@ -12,6 +12,7 @@ import { app } from 'electron';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const NIM = require('nim-web-sdk-ng/dist/nodejs/nim.js').default;
 import type { V2NIM } from 'nim-web-sdk-ng/dist/nodejs/nim';
+import { APP_ID } from '../appConstants';
 import {
   NimConfig,
   NimGatewayStatus,
@@ -104,7 +105,7 @@ function getSdkDataPath(account: string): string {
   try {
     baseDir = app.getPath('userData');
   } catch {
-    baseDir = path.join(os.homedir(), '.lobsterai');
+    baseDir = path.join(os.homedir(), `.${APP_ID}`);
   }
   const dataDir = path.join(baseDir, 'nim-data', account);
   if (!fs.existsSync(dataDir)) {

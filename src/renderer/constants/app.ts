@@ -1,4 +1,6 @@
-export const APP_NAME = 'LobsterAI';
-export const APP_ID = 'lobsterai';
-export const EXPORT_FORMAT_TYPE = 'lobsterai.providers';
-export const EXPORT_PASSWORD = 'lobsterai-APP';
+import brandConfig from '../../../brand.config.json';
+
+export const APP_NAME = brandConfig.appName;
+export const APP_ID = brandConfig.appId;
+export const EXPORT_FORMAT_TYPE = `${brandConfig.appId}.providers`;
+export const EXPORT_PASSWORD = `${brandConfig.appId}-APP`;

@@ -14,7 +14,7 @@ import { generateSessionTitle, probeCoworkModelReadiness } from './libs/coworkUt
 import { ensureSandboxReady, getSandboxStatus, onSandboxProgress } from './libs/coworkSandboxRuntime';
 import { startCoworkOpenAICompatProxy, stopCoworkOpenAICompatProxy, setScheduledTaskDeps } from './libs/coworkOpenAICompatProxy';
 import { IMGatewayManager, IMPlatform, IMGatewayConfig } from './im';
-import { APP_NAME } from './appConstants';
+import { APP_ID, APP_NAME } from './appConstants';
 import { getSkillServiceManager } from './skillServices';
 import { createTray, destroyTray, updateTrayMenu } from './trayManager';
 import { isAutoLaunched, getAutoLaunchEnabled, setAutoLaunchEnabled } from './autoLaunchManager';
@@ -94,7 +94,7 @@ const resolveInlineAttachmentDir = (cwd?: string): string => {
       return path.join(resolved, '.cowork-temp', 'attachments', 'manual');
     }
   }
-  return path.join(app.getPath('temp'), 'lobsterai', 'attachments');
+  return path.join(app.getPath('temp'), APP_ID, 'attachments');
 };
 
 const ensurePngFileName = (value: string): string => {
@@ -2630,7 +2630,7 @@ if (!gotTheLock) {
     // We don't trigger permission dialogs at startup to avoid annoying users
 
     // Ensure default working directory exists
-    const defaultProjectDir = path.join(os.homedir(), 'lobsterai', 'project');
+    const defaultProjectDir = path.join(os.homedir(), APP_ID, 'project');
     if (!fs.existsSync(defaultProjectDir)) {
       fs.mkdirSync(defaultProjectDir, { recursive: true });
       console.log('Created default project directory:', defaultProjectDir);
