@@ -314,7 +314,7 @@ export class IMGatewayManager extends EventEmitter {
         // Always use Cowork mode if handler is available
         if (this.coworkHandler) {
           console.log('[IMGatewayManager] Using Cowork mode for message processing');
-          response = await this.coworkHandler.processMessage(message);
+          response = await this.coworkHandler.processMessage(message, replyFn);
         } else {
           // Fallback to regular chat handler
           if (!this.chatHandler) {
@@ -328,7 +328,10 @@ export class IMGatewayManager extends EventEmitter {
           response = await this.chatHandler.processMessage(message);
         }
 
-        await replyFn(response);
+        // Only send final reply if there's unsent content (streaming may have sent everything already)
+        if (response && response.trim()) {
+          await replyFn(response);
+        }
       } catch (error: any) {
         console.error(`[IMGatewayManager] Error processing message: ${error.message}`);
         // Don't send "Replaced by a newer IM request" error to user, just log it

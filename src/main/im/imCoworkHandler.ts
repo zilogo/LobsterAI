@@ -57,6 +57,10 @@ export class IMCoworkHandler extends EventEmitter {
   private sessionConversationMap: Map<string, { conversationId: string; platform: IMPlatform }> = new Map();
   private pendingPermissionByConversation: Map<string, PendingIMPermission> = new Map();
 
+  // Stream reply functions and sent message tracking
+  private sessionReplyFns: Map<string, (text: string) => Promise<void>> = new Map();
+  private sentMessageIds: Set<string> = new Set();
+
   constructor(options: IMCoworkHandlerOptions) {
     super();
     this.coworkRunner = options.coworkRunner;
@@ -81,21 +85,21 @@ export class IMCoworkHandler extends EventEmitter {
   /**
    * Process an incoming IM message using CoworkRunner
    */
-  async processMessage(message: IMMessage): Promise<string> {
+  async processMessage(message: IMMessage, replyFn?: (text: string) => Promise<void>): Promise<string> {
     const pendingPermissionReply = await this.handlePendingPermissionReply(message);
     if (pendingPermissionReply !== null) {
       return pendingPermissionReply;
     }
 
     try {
-      return await this.processMessageInternal(message, false);
+      return await this.processMessageInternal(message, false, replyFn);
     } catch (error) {
       if (!this.isSessionNotFoundError(error)) {
         if (this.shouldRetryWithFreshSession(error, message)) {
           console.warn(
             `[IMCoworkHandler] Detected recoverable API 400 for ${message.platform}:${message.conversationId}, recreating session and retrying once`
           );
-          return this.processMessageInternal(message, true);
+          return this.processMessageInternal(message, true, replyFn);
         }
         throw error;
       }
@@ -103,11 +107,11 @@ export class IMCoworkHandler extends EventEmitter {
       console.warn(
         `[IMCoworkHandler] Cowork session mapping is stale for ${message.platform}:${message.conversationId}, recreating session`
       );
-      return this.processMessageInternal(message, true);
+      return this.processMessageInternal(message, true, replyFn);
     }
   }
 
-  private async processMessageInternal(message: IMMessage, forceNewSession: boolean): Promise<string> {
+  private async processMessageInternal(message: IMMessage, forceNewSession: boolean, replyFn?: (text: string) => Promise<void>): Promise<string> {
     const coworkSessionId = await this.getOrCreateCoworkSession(
       message.conversationId,
       message.platform,
@@ -119,6 +123,13 @@ export class IMCoworkHandler extends EventEmitter {
       conversationId: message.conversationId,
       platform: message.platform,
     });
+
+    // Store replyFn for streaming individual messages
+    if (replyFn) {
+      this.sessionReplyFns.set(coworkSessionId, replyFn);
+    } else {
+      this.sessionReplyFns.delete(coworkSessionId);
+    }
 
     const responsePromise = this.createAccumulatorPromise(coworkSessionId);
 
@@ -360,10 +371,18 @@ export class IMCoworkHandler extends EventEmitter {
 
   /**
    * Handle message event from CoworkRunner
+   *
+   * When a new message arrives, any previous unsent assistant messages in the
+   * accumulator are considered complete (streaming updates have finished) and
+   * are sent immediately via replyFn. The newly arrived message is then pushed
+   * into the accumulator for future processing.
    */
   private handleMessage(sessionId: string, message: CoworkMessage): void {
     // Only process messages from IM sessions
     if (!this.imSessionIds.has(sessionId)) return;
+
+    // Before adding the new message, flush any completed unsent assistant messages
+    this.flushCompletedAssistantMessages(sessionId);
 
     const accumulator = this.messageAccumulators.get(sessionId);
     if (accumulator) {
@@ -406,12 +425,22 @@ export class IMCoworkHandler extends EventEmitter {
       const timeoutId = setTimeout(() => {
         const accumulator = this.messageAccumulators.get(sessionId);
         if (accumulator && accumulator.timeoutId === timeoutId) {
-          const partialReply = this.formatReply(accumulator.messages);
+          // Exclude already-streamed messages from the timeout reply
+          const partialReply = this.formatReply(accumulator.messages, true);
+          this.cleanupStreamState(sessionId);
           this.cleanupAccumulator(sessionId);
-          if (partialReply && partialReply !== '处理完成，但没有生成回复。') {
+          if (partialReply) {
             accumulator.resolve(partialReply + '\n\n[处理超时，以上为部分结果]');
           } else {
-            accumulator.reject(new Error('处理超时，请稍后重试'));
+            // If all messages were already streamed, just resolve empty
+            const hasStreamedAny = accumulator.messages.some(
+              m => m.type === 'assistant' && m.content && !m.metadata?.isThinking
+            );
+            if (hasStreamedAny) {
+              accumulator.resolve('');
+            } else {
+              accumulator.reject(new Error('处理超时，请稍后重试'));
+            }
           }
         }
       }, ACCUMULATOR_TIMEOUT_MS);
@@ -613,9 +642,14 @@ export class IMCoworkHandler extends EventEmitter {
     if (!this.imSessionIds.has(sessionId)) return;
 
     this.clearPendingPermissionsBySessionId(sessionId);
+
+    // Flush the last assistant message (its streaming is now complete)
+    this.flushCompletedAssistantMessages(sessionId);
+
     const accumulator = this.messageAccumulators.get(sessionId);
     if (accumulator) {
-      const replyText = this.formatReply(accumulator.messages);
+      // Only return content that hasn't been streamed yet
+      const replyText = this.formatReply(accumulator.messages, true);
 
       // 打印完整的输出消息日志
       console.log(`[IMCoworkHandler] 会话完成:`, JSON.stringify({
@@ -625,6 +659,7 @@ export class IMCoworkHandler extends EventEmitter {
         reply: replyText,
       }, null, 2));
 
+      this.cleanupStreamState(sessionId);
       this.cleanupAccumulator(sessionId);
       accumulator.resolve(replyText);
     }
@@ -640,6 +675,7 @@ export class IMCoworkHandler extends EventEmitter {
     this.clearPendingPermissionsBySessionId(sessionId);
     const accumulator = this.messageAccumulators.get(sessionId);
     if (accumulator) {
+      this.cleanupStreamState(sessionId);
       this.cleanupAccumulator(sessionId);
       accumulator.reject(new Error(error));
     }
@@ -657,9 +693,54 @@ export class IMCoworkHandler extends EventEmitter {
   }
 
   /**
-   * Format accumulated messages into a reply string
+   * Flush completed (unsent) assistant messages via replyFn.
+   *
+   * Called when a new message arrives or when the session completes.
+   * By the time a new message event fires, all previous messages in the
+   * accumulator have their final content (streaming updates are done).
    */
-  private formatReply(messages: CoworkMessage[]): string {
+  private flushCompletedAssistantMessages(sessionId: string): void {
+    const replyFn = this.sessionReplyFns.get(sessionId);
+    if (!replyFn) return;
+
+    const accumulator = this.messageAccumulators.get(sessionId);
+    if (!accumulator) return;
+
+    for (const msg of accumulator.messages) {
+      if (
+        msg.type === 'assistant' &&
+        msg.content &&
+        !msg.metadata?.isThinking &&
+        !this.sentMessageIds.has(msg.id)
+      ) {
+        this.sentMessageIds.add(msg.id);
+        replyFn(msg.content).catch((err) => {
+          console.error(`[IMCoworkHandler] Stream reply failed for message ${msg.id}:`, err);
+        });
+      }
+    }
+  }
+
+  /**
+   * Clean up stream-related state for a session
+   */
+  private cleanupStreamState(sessionId: string): void {
+    this.sessionReplyFns.delete(sessionId);
+    // Clean up sent message IDs belonging to this session's accumulator
+    // (sentMessageIds is a flat set; entries are removed in bulk here)
+    const accumulator = this.messageAccumulators.get(sessionId);
+    if (accumulator) {
+      for (const msg of accumulator.messages) {
+        this.sentMessageIds.delete(msg.id);
+      }
+    }
+  }
+
+  /**
+   * Format accumulated messages into a reply string
+   * @param excludeSent - if true, skip messages already sent via stream
+   */
+  private formatReply(messages: CoworkMessage[], excludeSent: boolean = false): string {
     const parts: string[] = [];
 
     for (const msg of messages) {
@@ -668,11 +749,13 @@ export class IMCoworkHandler extends EventEmitter {
 
       // Only include assistant messages in reply (skip thinking messages)
       if (msg.type === 'assistant' && msg.content && !msg.metadata?.isThinking) {
+        // Skip messages already streamed to the user
+        if (excludeSent && this.sentMessageIds.has(msg.id)) continue;
         parts.push(msg.content);
       }
     }
 
-    return parts.join('\n\n') || '处理完成，但没有生成回复。';
+    return parts.join('\n\n') || '';
   }
 
   /**
@@ -715,6 +798,8 @@ export class IMCoworkHandler extends EventEmitter {
     this.messageAccumulators.clear();
     this.imSessionIds.clear();
     this.sessionConversationMap.clear();
+    this.sessionReplyFns.clear();
+    this.sentMessageIds.clear();
 
     this.pendingPermissionByConversation.forEach((pending) => {
       if (pending.timeoutId) {
