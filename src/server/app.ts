@@ -1,5 +1,6 @@
 import express from 'express';
 import path from 'path';
+import http from 'http';
 import { authMiddleware } from './middleware/auth';
 import { errorHandler } from './middleware/errorHandler';
 
@@ -54,13 +55,30 @@ export function createApp(): express.Application {
   app.use('/api/app', appRouter);
   app.use('/api/log', logRouter);
 
-  // 生产模式：提供前端静态文件
+  // 前端静态文件
   if (process.env.NODE_ENV === 'production') {
-    const staticPath = path.resolve(__dirname, '../../dist-web');
+    // 生产模式：直接提供构建产物
+    const staticPath = path.resolve(__dirname, '../../../dist-web');
     app.use(express.static(staticPath));
-    // SPA fallback
     app.get('*', (_req, res) => {
       res.sendFile(path.join(staticPath, 'index.html'));
+    });
+  } else {
+    // 开发模式：将非 API 请求反向代理到 Vite dev server
+    const VITE_PORT = 5176;
+    app.use((req, res) => {
+      const proxyHeaders = { ...req.headers, host: `127.0.0.1:${VITE_PORT}` };
+      const proxyReq = http.request(
+        { hostname: '127.0.0.1', port: VITE_PORT, path: req.originalUrl, method: req.method, headers: proxyHeaders },
+        (proxyRes) => {
+          res.writeHead(proxyRes.statusCode || 502, proxyRes.headers);
+          proxyRes.pipe(res);
+        },
+      );
+      proxyReq.on('error', () => {
+        res.status(502).send('Vite dev server not ready');
+      });
+      req.pipe(proxyReq);
     });
   }
 

@@ -251,3 +251,31 @@ The Cowork feature provides AI-assisted coding sessions:
 - Window controls (minimize/maximize/close): No-op in Web mode
 - Auto-launch / app update: No-op in Web mode
 - Sandbox execution mode: Not yet supported in Web mode
+
+### Cloudflare Tunnel (External Access)
+
+Web 模式可通过 Cloudflare Tunnel 暴露到外网，无需公网 IP 或域名备案。
+
+**启动方式：**
+
+```bash
+# 先启动 Web 模式
+npm run web:dev
+
+# 再启动 Cloudflare Tunnel（指向 Express 端口）
+cloudflared tunnel --url http://localhost:3001
+```
+
+启动后终端会输出一个 `https://xxx.trycloudflare.com` 地址，通过该地址即可从外部访问。
+
+**已有的关键配置（勿删除）：**
+
+1. **`vite.config.web.ts`** — `server.allowedHosts: true`：允许 Vite 接受非 localhost 的 Host header，否则 Tunnel 转发的请求会被 Vite 拒绝
+2. **`src/server/app.ts`** — 开发模式反向代理重写 Host header 为 `127.0.0.1:5176`：Express 将前端请求代理到 Vite 时，将外部域名的 Host 改为本地地址，避免 Vite Host 校验失败
+
+**注意事项：**
+
+- Quick Tunnel 每次重启会生成新的随机 URL
+- 免费 Tunnel 单请求上限 100MB，但因文件上传使用 base64 编码（膨胀 ~33%），Express JSON body 限制 50MB，实际可上传文件约 **37MB**
+- WebSocket 通过 Tunnel 正常工作（Cloudflare 支持 WebSocket 透传）
+- 如需固定域名，需注册 Cloudflare 账号并创建 Named Tunnel
