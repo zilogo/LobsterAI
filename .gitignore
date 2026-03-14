@@ -6,6 +6,8 @@ release/
 node_modules
 dist
 dist-electron
+dist-server
+dist-web
 .DS_Store
 .env 
 .claude/

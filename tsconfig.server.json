@@ -1,0 +1,21 @@
+{
+  "compilerOptions": {
+    "target": "ESNext",
+    "module": "CommonJS",
+    "allowJs": true,
+    "skipLibCheck": true,
+    "esModuleInterop": true,
+    "noImplicitAny": true,
+    "sourceMap": true,
+    "baseUrl": ".",
+    "outDir": "dist-server",
+    "moduleResolution": "node",
+    "resolveJsonModule": true,
+    "declaration": false,
+    "paths": {
+      "*": ["node_modules/*"]
+    }
+  },
+  "include": ["src/server", "src/shared", "src/main"],
+  "exclude": ["node_modules", "dist", "dist-electron", "dist-web", "dist-server"]
+}
