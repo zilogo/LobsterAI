@@ -14,8 +14,13 @@ import {
 import { APP_ID } from './appConstants';
 import { judgeMemoryCandidate } from './libs/coworkMemoryJudge';
 
-// Default working directory for new users
+// Default working directory for new users.
+// Can be overridden via LOBSTERAI_WORKING_DIR environment variable (useful for Web mode).
 const getDefaultWorkingDirectory = (): string => {
+  const envDir = process.env.LOBSTERAI_WORKING_DIR;
+  if (envDir && envDir.trim()) {
+    return path.resolve(envDir.trim());
+  }
   return path.join(os.homedir(), APP_ID, 'project');
 };
 
