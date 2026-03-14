@@ -121,6 +121,14 @@ interface CoworkSandboxProgress {
   url?: string;
 }
 
+interface FileEntry {
+  name: string;
+  path: string;
+  isDirectory: boolean;
+  size: number;
+  modifiedAt: number;
+}
+
 interface AppUpdateDownloadProgress {
   received: number;
   total: number | undefined;
@@ -341,10 +349,19 @@ interface IElectronAPI {
     onStreamComplete: (callback: (data: { sessionId: string; claudeSessionId: string | null }) => void) => () => void;
     onStreamError: (callback: (data: { sessionId: string; error: string }) => void) => () => void;
   };
+  files: {
+    list: (dirPath: string) => Promise<{ success: boolean; entries?: FileEntry[]; error?: string }>;
+    upload: (options: { dataBase64: string; fileName: string; targetDir: string; mimeType?: string })
+      => Promise<{ success: boolean; path?: string; error?: string }>;
+    download: (filePath: string) => Promise<void>;
+    delete: (targetPath: string) => Promise<{ success: boolean; error?: string }>;
+    mkdir: (dirPath: string) => Promise<{ success: boolean; path?: string; error?: string }>;
+    rename: (oldPath: string, newPath: string) => Promise<{ success: boolean; error?: string }>;
+  };
   dialog: {
     selectDirectory: () => Promise<{ success: boolean; path: string | null }>;
-    selectFile: (options?: { title?: string; filters?: { name: string; extensions: string[] }[] }) => Promise<{ success: boolean; path: string | null }>;
-    selectFiles: (options?: { title?: string; filters?: { name: string; extensions: string[] }[] }) => Promise<{ success: boolean; paths: string[] }>;
+    selectFile: (options?: { title?: string; filters?: { name: string; extensions: string[] }[]; cwd?: string }) => Promise<{ success: boolean; path: string | null }>;
+    selectFiles: (options?: { title?: string; filters?: { name: string; extensions: string[] }[]; cwd?: string }) => Promise<{ success: boolean; paths: string[] }>;
     saveInlineFile: (options: { dataBase64: string; fileName?: string; mimeType?: string; cwd?: string }) => Promise<{ success: boolean; path: string | null; error?: string }>;
     readFileAsDataUrl: (filePath: string) => Promise<{ success: boolean; dataUrl?: string; error?: string }>;
   };

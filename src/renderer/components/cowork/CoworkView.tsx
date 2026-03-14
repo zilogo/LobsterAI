@@ -10,10 +10,12 @@ import { quickActionService } from '../../services/quickAction';
 import { i18nService } from '../../services/i18n';
 import CoworkPromptInput, { type CoworkPromptInputRef } from './CoworkPromptInput';
 import CoworkSessionDetail from './CoworkSessionDetail';
+import WorkspacePanel from './WorkspacePanel';
 import ModelSelector from '../ModelSelector';
 import SidebarToggleIcon from '../icons/SidebarToggleIcon';
 import ComposeIcon from '../icons/ComposeIcon';
 import WindowTitleBar from '../window/WindowTitleBar';
+import { FolderOpenIcon } from '@heroicons/react/24/outline';
 import { QuickActionBar, PromptPanel } from '../quick-actions';
 import type { SettingsOpenOptions } from '../Settings';
 import type { CoworkSession, CoworkImageAttachment } from '../../types/cowork';
@@ -38,6 +40,8 @@ const CoworkView: React.FC<CoworkViewProps> = ({ onRequestAppSettings, onShowSki
   const startRequestIdRef = useRef(0);
   // Ref for CoworkPromptInput
   const promptInputRef = useRef<CoworkPromptInputRef>(null);
+  // Workspace panel
+  const [isWorkspacePanelOpen, setIsWorkspacePanelOpen] = useState(false);
 
   const {
     currentSession,
@@ -334,7 +338,7 @@ const CoworkView: React.FC<CoworkViewProps> = ({ onRequestAppSettings, onShowSki
   // When there's a current session, show the session detail view
   if (currentSession) {
     return (
-      <>
+      <div className="flex-1 flex h-full overflow-hidden">
         <CoworkSessionDetail
           onManageSkills={() => onShowSkills?.()}
           onContinue={handleContinueSession}
@@ -344,14 +348,22 @@ const CoworkView: React.FC<CoworkViewProps> = ({ onRequestAppSettings, onShowSki
           onToggleSidebar={onToggleSidebar}
           onNewChat={onNewChat}
           updateBadge={updateBadge}
+          isWorkspacePanelOpen={isWorkspacePanelOpen}
+          onToggleWorkspacePanel={() => setIsWorkspacePanelOpen((v) => !v)}
         />
-      </>
+        <WorkspacePanel
+          isOpen={isWorkspacePanelOpen}
+          onClose={() => setIsWorkspacePanelOpen(false)}
+          workingDirectory={currentSession.cwd || config.workingDirectory}
+        />
+      </div>
     );
   }
 
   // Home view - no current session
   return (
-    <div className="flex-1 flex flex-col dark:bg-claude-darkBg bg-claude-bg h-full">
+    <div className="flex-1 flex h-full overflow-hidden">
+    <div className="flex-1 flex flex-col dark:bg-claude-darkBg bg-claude-bg h-full min-w-0">
       {/* Header */}
       <div className="draggable flex h-12 items-center justify-between px-4 border-b dark:border-claude-darkBorder border-claude-border shrink-0">
         <div className="non-draggable h-8 flex items-center">
@@ -376,7 +388,22 @@ const CoworkView: React.FC<CoworkViewProps> = ({ onRequestAppSettings, onShowSki
           )}
           <ModelSelector />
         </div>
-        <WindowTitleBar inline />
+        <div className="non-draggable flex items-center gap-1">
+          {/* Workspace panel toggle */}
+          <button
+            type="button"
+            onClick={() => setIsWorkspacePanelOpen((v) => !v)}
+            className={`p-1.5 rounded-lg transition-colors ${
+              isWorkspacePanelOpen
+                ? 'dark:bg-claude-darkSurfaceHover bg-claude-surfaceHover dark:text-claude-darkText text-claude-text'
+                : 'dark:text-claude-darkTextSecondary text-claude-textSecondary dark:hover:bg-claude-darkSurfaceHover hover:bg-claude-surfaceHover'
+            }`}
+            aria-label={i18nService.t('workspaceFiles')}
+          >
+            <FolderOpenIcon className="h-5 w-5" />
+          </button>
+          <WindowTitleBar inline />
+        </div>
       </div>
 
       {/* Main Content */}
@@ -426,6 +453,12 @@ const CoworkView: React.FC<CoworkViewProps> = ({ onRequestAppSettings, onShowSki
           </div>
         </div>
       </div>
+    </div>
+    <WorkspacePanel
+      isOpen={isWorkspacePanelOpen}
+      onClose={() => setIsWorkspacePanelOpen(false)}
+      workingDirectory={config.workingDirectory}
+    />
     </div>
   );
 };

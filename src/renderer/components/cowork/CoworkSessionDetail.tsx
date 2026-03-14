@@ -13,6 +13,7 @@ import {
   ExclamationTriangleIcon,
   ChevronRightIcon,
   PhotoIcon,
+  FolderOpenIcon,
 } from '@heroicons/react/24/outline';
 import { FolderIcon } from '@heroicons/react/24/solid';
 import { coworkService } from '../../services/cowork';
@@ -34,6 +35,8 @@ interface CoworkSessionDetailProps {
   onToggleSidebar?: () => void;
   onNewChat?: () => void;
   updateBadge?: React.ReactNode;
+  isWorkspacePanelOpen?: boolean;
+  onToggleWorkspacePanel?: () => void;
 }
 
 const AUTO_SCROLL_THRESHOLD = 120;
@@ -1172,6 +1175,8 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
   onToggleSidebar,
   onNewChat,
   updateBadge,
+  isWorkspacePanelOpen,
+  onToggleWorkspacePanel,
 }) => {
   const isMac = window.electron.platform === 'darwin';
   const currentSession = useSelector((state: RootState) => state.cowork.currentSession);
@@ -1205,6 +1210,7 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
   const [renameValue, setRenameValue] = useState('');
   const renameInputRef = useRef<HTMLInputElement>(null);
   const ignoreNextBlurRef = useRef(false);
+
 
   // Reset rename value when session changes
   useEffect(() => {
@@ -1759,7 +1765,7 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
   };
 
   return (
-    <div ref={detailRootRef} className="flex-1 flex flex-col dark:bg-claude-darkBg bg-claude-bg h-full">
+    <div ref={detailRootRef} className="flex-1 flex flex-col dark:bg-claude-darkBg bg-claude-bg h-full min-w-0">
       {/* Header */}
       <div className="draggable flex h-12 items-center justify-between px-4 border-b dark:border-claude-darkBorder border-claude-border dark:bg-claude-darkSurface/50 bg-claude-surface/50 shrink-0">
         {/* Left side: Toggle buttons (when collapsed) + Title + Sandbox badge */}
@@ -1830,6 +1836,20 @@ const CoworkSessionDetail: React.FC<CoworkSessionDetailProps> = ({
             <span className="max-w-[120px] truncate text-xs">
               {truncatePath(currentSession.cwd)}
             </span>
+          </button>
+
+          {/* Workspace panel toggle */}
+          <button
+            type="button"
+            onClick={onToggleWorkspacePanel}
+            className={`p-1.5 rounded-lg transition-colors ${
+              isWorkspacePanelOpen
+                ? 'dark:bg-claude-darkSurfaceHover bg-claude-surfaceHover dark:text-claude-darkText text-claude-text'
+                : 'dark:text-claude-darkTextSecondary text-claude-textSecondary dark:hover:bg-claude-darkSurfaceHover hover:bg-claude-surfaceHover'
+            }`}
+            aria-label={i18nService.t('workspaceFiles')}
+          >
+            <FolderOpenIcon className="h-5 w-5" />
           </button>
 
           {/* Menu button */}

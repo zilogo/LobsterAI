@@ -26,6 +26,7 @@ import { initLogger, getLogFilePath } from './logger';
 import { getCoworkLogPath } from './libs/coworkLogger';
 import { exportLogsZip } from './libs/logExport';
 import { ensurePythonRuntimeReady } from './libs/pythonRuntime';
+import { assertWithinWorkspace } from './libs/fileUtils';
 import {
   applySystemProxyEnv,
   resolveSystemProxyUrl,
@@ -2145,6 +2146,175 @@ if (!gotTheLock) {
       }
     }
   );
+
+  // ==================== Files (Workspace File Browser) ====================
+  ipcMain.handle('files:list', async (_event, dirPath: string) => {
+    try {
+      const workingDir = getCoworkStore().getConfig().workingDirectory;
+      const targetDir = dirPath || workingDir;
+      const resolved = assertWithinWorkspace(targetDir, workingDir);
+
+      if (!fs.existsSync(resolved) || !fs.statSync(resolved).isDirectory()) {
+        return { success: false, error: 'Directory not found' };
+      }
+
+      const dirents = fs.readdirSync(resolved, { withFileTypes: true });
+      const entries = dirents
+        .filter((d) => !d.name.startsWith('.'))
+        .map((d) => {
+          const fullPath = path.join(resolved, d.name);
+          let size = 0;
+          let modifiedAt = 0;
+          try {
+            const stat = fs.statSync(fullPath);
+            size = d.isDirectory() ? 0 : stat.size;
+            modifiedAt = stat.mtimeMs;
+          } catch {
+            // ignore
+          }
+          return { name: d.name, path: fullPath, isDirectory: d.isDirectory(), size, modifiedAt };
+        })
+        .sort((a, b) => {
+          if (a.isDirectory !== b.isDirectory) return a.isDirectory ? -1 : 1;
+          return a.name.localeCompare(b.name);
+        });
+
+      return { success: true, entries };
+    } catch (error: any) {
+      return { success: false, error: error.message };
+    }
+  });
+
+  ipcMain.handle('files:upload', async (_event, options: { dataBase64: string; fileName: string; targetDir: string; mimeType?: string }) => {
+    try {
+      const workingDir = getCoworkStore().getConfig().workingDirectory;
+      const { dataBase64, fileName, targetDir } = options;
+
+      if (!dataBase64 || !fileName || !targetDir) {
+        return { success: false, error: 'Missing required fields' };
+      }
+
+      const resolvedDir = assertWithinWorkspace(targetDir, workingDir);
+
+      let rawBase64 = dataBase64.trim();
+      const commaIdx = rawBase64.indexOf(',');
+      if (commaIdx !== -1 && rawBase64.slice(0, commaIdx).includes(';base64')) {
+        rawBase64 = rawBase64.slice(commaIdx + 1);
+      }
+
+      const buffer = Buffer.from(rawBase64, 'base64');
+      if (!buffer.length) return { success: false, error: 'Invalid file data' };
+
+      const INVALID_CHARS = /[<>:"/\\|?*\u0000-\u001F]/g;
+      const safeName = path.basename(fileName).replace(INVALID_CHARS, '_');
+      let outputPath = path.join(resolvedDir, safeName);
+
+      if (fs.existsSync(outputPath)) {
+        const ext = path.extname(safeName);
+        const base = safeName.slice(0, -ext.length || undefined);
+        let counter = 1;
+        while (fs.existsSync(outputPath)) {
+          outputPath = path.join(resolvedDir, `${base} (${counter})${ext}`);
+          counter++;
+        }
+      }
+
+      assertWithinWorkspace(outputPath, workingDir);
+      fs.writeFileSync(outputPath, buffer);
+      return { success: true, path: outputPath };
+    } catch (error: any) {
+      return { success: false, error: error.message };
+    }
+  });
+
+  ipcMain.handle('files:download', async (event, filePath: string) => {
+    try {
+      const workingDir = getCoworkStore().getConfig().workingDirectory;
+      const resolved = assertWithinWorkspace(filePath, workingDir);
+
+      if (!fs.existsSync(resolved) || fs.statSync(resolved).isDirectory()) {
+        return { success: false, error: 'File not found' };
+      }
+
+      const ownerWindow = BrowserWindow.fromWebContents(event.sender);
+      const result = ownerWindow
+        ? await dialog.showSaveDialog(ownerWindow, { defaultPath: path.basename(resolved) })
+        : await dialog.showSaveDialog({ defaultPath: path.basename(resolved) });
+
+      if (result.canceled || !result.filePath) {
+        return { success: true, canceled: true };
+      }
+
+      fs.copyFileSync(resolved, result.filePath);
+      return { success: true, path: result.filePath };
+    } catch (error: any) {
+      return { success: false, error: error.message };
+    }
+  });
+
+  ipcMain.handle('files:delete', async (_event, targetPath: string) => {
+    try {
+      const workingDir = getCoworkStore().getConfig().workingDirectory;
+      const resolved = assertWithinWorkspace(targetPath, workingDir);
+
+      const resolvedCwd = fs.realpathSync(path.resolve(workingDir));
+      if (resolved === resolvedCwd) {
+        return { success: false, error: 'Cannot delete workspace root' };
+      }
+
+      if (!fs.existsSync(resolved)) {
+        return { success: false, error: 'Path not found' };
+      }
+
+      const stat = fs.statSync(resolved);
+      if (stat.isDirectory()) {
+        fs.rmdirSync(resolved);
+      } else {
+        fs.unlinkSync(resolved);
+      }
+
+      return { success: true };
+    } catch (error: any) {
+      return { success: false, error: error.message };
+    }
+  });
+
+  ipcMain.handle('files:mkdir', async (_event, dirPath: string) => {
+    try {
+      const workingDir = getCoworkStore().getConfig().workingDirectory;
+      const resolved = assertWithinWorkspace(dirPath, workingDir);
+
+      if (fs.existsSync(resolved)) {
+        return { success: false, error: 'Path already exists' };
+      }
+
+      fs.mkdirSync(resolved, { recursive: true });
+      return { success: true, path: resolved };
+    } catch (error: any) {
+      return { success: false, error: error.message };
+    }
+  });
+
+  ipcMain.handle('files:rename', async (_event, oldPath: string, newPath: string) => {
+    try {
+      const workingDir = getCoworkStore().getConfig().workingDirectory;
+      const resolvedOld = assertWithinWorkspace(oldPath, workingDir);
+      const resolvedNew = assertWithinWorkspace(newPath, workingDir);
+
+      if (!fs.existsSync(resolvedOld)) {
+        return { success: false, error: 'Source path not found' };
+      }
+
+      if (fs.existsSync(resolvedNew)) {
+        return { success: false, error: 'Target path already exists' };
+      }
+
+      fs.renameSync(resolvedOld, resolvedNew);
+      return { success: true };
+    } catch (error: any) {
+      return { success: false, error: error.message };
+    }
+  });
 
   // Shell handlers - 打开文件/文件夹
   ipcMain.handle('shell:openPath', async (_event, filePath: string) => {

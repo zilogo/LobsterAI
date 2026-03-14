@@ -463,6 +463,7 @@ const CoworkPromptInput = React.forwardRef<CoworkPromptInputRef, CoworkPromptInp
     try {
       const result = await window.electron.dialog.selectFiles({
         title: i18nService.t('coworkAddFile'),
+        cwd: workingDirectory,
       });
       if (!result.success || result.paths.length === 0) return;
       for (const filePath of result.paths) {
@@ -484,7 +485,7 @@ const CoworkPromptInput = React.forwardRef<CoworkPromptInputRef, CoworkPromptInp
     } finally {
       setIsAddingFile(false);
     }
-  }, [addAttachment, isAddingFile, disabled, isStreaming, modelSupportsImage]);
+  }, [addAttachment, isAddingFile, disabled, isStreaming, modelSupportsImage, workingDirectory]);
 
   const handleRemoveAttachment = useCallback((path: string) => {
     setAttachments((prev) => prev.filter((attachment) => attachment.path !== path));

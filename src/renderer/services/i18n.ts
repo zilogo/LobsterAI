@@ -416,6 +416,19 @@ const translations: Record<LanguageType, Record<string, string>> = {
     noRecentFolders: '暂无最近文件夹',
     coworkOpenFolder: '打开文件夹',
 
+    // Workspace Panel
+    workspaceFiles: '工作区文件',
+    workspaceUpload: '上传',
+    workspaceNewFolder: '新建文件夹',
+    workspaceRefresh: '刷新',
+    workspaceDownload: '下载',
+    workspaceRename: '重命名',
+    workspaceDelete: '删除',
+    workspaceDeleteConfirm: '确定要删除吗？',
+    workspaceNewFolderName: '文件夹名称',
+    workspaceEmpty: '目录为空',
+    workspaceNotConfigured: '请先配置工作目录',
+
     // Skills
     skills: '技能',
     searchSkills: '搜索技能',
@@ -1191,6 +1204,19 @@ const translations: Record<LanguageType, Record<string, string>> = {
     coworkSelectFolderFirst: 'Please select a task folder before submitting',
     noRecentFolders: 'No recent folders',
     coworkOpenFolder: 'Open folder',
+
+    // Workspace Panel
+    workspaceFiles: 'Workspace Files',
+    workspaceUpload: 'Upload',
+    workspaceNewFolder: 'New Folder',
+    workspaceRefresh: 'Refresh',
+    workspaceDownload: 'Download',
+    workspaceRename: 'Rename',
+    workspaceDelete: 'Delete',
+    workspaceDeleteConfirm: 'Are you sure you want to delete?',
+    workspaceNewFolderName: 'Folder name',
+    workspaceEmpty: 'Directory is empty',
+    workspaceNotConfigured: 'Please configure working directory first',
 
     // Skills
     skills: 'Skills',

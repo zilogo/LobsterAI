@@ -70,6 +70,10 @@ export class ElectronAdapter implements IPlatformAdapter {
     return this._electron.cowork;
   }
 
+  get files() {
+    return this._electron.files;
+  }
+
   get dialog() {
     return this._electron.dialog;
   }

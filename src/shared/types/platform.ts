@@ -229,6 +229,14 @@ export interface ImageAttachment {
   base64Data: string;
 }
 
+export interface FileEntry {
+  name: string;
+  path: string;        // 绝对路径
+  isDirectory: boolean;
+  size: number;         // 字节数，目录为 0
+  modifiedAt: number;   // Unix timestamp (ms)
+}
+
 // ========== IPlatformAdapter 接口定义 ==========
 
 export interface IPlatformAdapter {
@@ -375,10 +383,20 @@ export interface IPlatformAdapter {
     onStreamError: (callback: (data: { sessionId: string; error: string }) => void) => () => void;
   };
 
+  files: {
+    list: (dirPath: string) => Promise<{ success: boolean; entries?: FileEntry[]; error?: string }>;
+    upload: (options: { dataBase64: string; fileName: string; targetDir: string; mimeType?: string })
+      => Promise<{ success: boolean; path?: string; error?: string }>;
+    download: (filePath: string) => Promise<void>;
+    delete: (targetPath: string) => Promise<{ success: boolean; error?: string }>;
+    mkdir: (dirPath: string) => Promise<{ success: boolean; path?: string; error?: string }>;
+    rename: (oldPath: string, newPath: string) => Promise<{ success: boolean; error?: string }>;
+  };
+
   dialog: {
     selectDirectory: () => Promise<{ success: boolean; path: string | null }>;
-    selectFile: (options?: { title?: string; filters?: { name: string; extensions: string[] }[] }) => Promise<{ success: boolean; path: string | null }>;
-    selectFiles: (options?: { title?: string; filters?: { name: string; extensions: string[] }[] }) => Promise<{ success: boolean; paths: string[] }>;
+    selectFile: (options?: { title?: string; filters?: { name: string; extensions: string[] }[]; cwd?: string }) => Promise<{ success: boolean; path: string | null }>;
+    selectFiles: (options?: { title?: string; filters?: { name: string; extensions: string[] }[]; cwd?: string }) => Promise<{ success: boolean; paths: string[] }>;
     saveInlineFile: (options: { dataBase64: string; fileName?: string; mimeType?: string; cwd?: string }) => Promise<{ success: boolean; path: string | null; error?: string }>;
     readFileAsDataUrl: (filePath: string) => Promise<{ success: boolean; dataUrl?: string; error?: string }>;
   };

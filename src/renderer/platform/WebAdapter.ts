@@ -1,5 +1,6 @@
 import type { IPlatformAdapter, CoworkPermissionResult, CoworkConfigUpdate, ImageAttachment } from '../../shared/types/platform';
 import { WebSocketManager } from './WebSocketManager';
+import { fileToBase64 } from '../utils/file';
 
 /**
  * WebAdapter — HTTP REST + WebSocket 客户端。
@@ -31,6 +32,8 @@ const apiFetch = async (path: string, options: RequestInit = {}): Promise<any> =
   }
   return response.json();
 };
+
+const MAX_UPLOAD_BYTES = 25 * 1024 * 1024; // 25MB
 
 export class WebAdapter implements IPlatformAdapter {
   private wsManager: WebSocketManager;
@@ -286,6 +289,55 @@ export class WebAdapter implements IPlatformAdapter {
       this.wsManager.on('cowork:stream:error', (data) => callback(data.payload)),
   };
 
+  // ==================== Files (Workspace File Browser) ====================
+  files = {
+    list: (dirPath: string) =>
+      apiFetch(`/files/list?dir=${encodeURIComponent(dirPath)}`),
+    upload: (options: { dataBase64: string; fileName: string; targetDir: string; mimeType?: string }) =>
+      apiFetch('/files/upload', {
+        method: 'POST',
+        body: JSON.stringify(options),
+      }),
+    download: async (filePath: string) => {
+      // 使用 fetch 下载以携带 Authorization header
+      const url = `${getBaseUrl()}/api/files/download?path=${encodeURIComponent(filePath)}`;
+      const headers: Record<string, string> = {};
+      const token = sessionStorage.getItem('lobsterai_token');
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+      const response = await fetch(url, { headers });
+      if (!response.ok) {
+        throw new Error(`Download failed: ${response.status}`);
+      }
+      const blob = await response.blob();
+      const fileName = filePath.split(/[/\\]/).pop() || 'download';
+      const objectUrl = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = objectUrl;
+      link.download = fileName;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(objectUrl);
+    },
+    delete: (targetPath: string) =>
+      apiFetch('/files/delete', {
+        method: 'POST',
+        body: JSON.stringify({ targetPath }),
+      }),
+    mkdir: (dirPath: string) =>
+      apiFetch('/files/mkdir', {
+        method: 'POST',
+        body: JSON.stringify({ dirPath }),
+      }),
+    rename: (oldPath: string, newPath: string) =>
+      apiFetch('/files/rename', {
+        method: 'POST',
+        body: JSON.stringify({ oldPath, newPath }),
+      }),
+  };
+
   // ==================== Dialog ====================
   dialog = {
     selectDirectory: () =>
@@ -299,9 +351,32 @@ export class WebAdapter implements IPlatformAdapter {
           const exts = _options.filters.flatMap((f: any) => f.extensions.map((e: string) => `.${e}`));
           input.accept = exts.join(',');
         }
-        input.onchange = () => {
+        input.onchange = async () => {
           const file = input.files?.[0];
-          resolve({ success: true, path: file ? file.name : null });
+          if (!file) {
+            resolve({ success: true, path: null });
+            return;
+          }
+          if (file.size > MAX_UPLOAD_BYTES) {
+            resolve({ success: false, path: null });
+            return;
+          }
+          try {
+            const base64 = await fileToBase64(file);
+            const result = await apiFetch('/files/save-inline', {
+              method: 'POST',
+              body: JSON.stringify({
+                dataBase64: base64,
+                fileName: file.name,
+                mimeType: file.type,
+                cwd: _options?.cwd,
+              }),
+            });
+            resolve({ success: true, path: result.success ? result.path : file.name });
+          } catch (err) {
+            console.warn('[WebAdapter] File upload failed:', file.name, err);
+            resolve({ success: false, path: null });
+          }
         };
         input.click();
       });
@@ -315,8 +390,35 @@ export class WebAdapter implements IPlatformAdapter {
           const exts = _options.filters.flatMap((f: any) => f.extensions.map((e: string) => `.${e}`));
           input.accept = exts.join(',');
         }
-        input.onchange = () => {
-          const paths = Array.from(input.files || []).map((f) => f.name);
+        input.onchange = async () => {
+          const files = Array.from(input.files || []);
+          if (files.length === 0) {
+            resolve({ success: true, paths: [] });
+            return;
+          }
+          const uploadResults = await Promise.allSettled(
+            files.map(async (file) => {
+              if (file.size > MAX_UPLOAD_BYTES) {
+                console.warn(`[WebAdapter] File too large, skipping: ${file.name}`);
+                return null;
+              }
+              const base64 = await fileToBase64(file);
+              const result = await apiFetch('/files/save-inline', {
+                method: 'POST',
+                body: JSON.stringify({
+                  dataBase64: base64,
+                  fileName: file.name,
+                  mimeType: file.type,
+                  cwd: _options?.cwd,
+                }),
+              });
+              return result.success ? result.path : null;
+            })
+          );
+          const paths = uploadResults
+            .filter((r): r is PromiseFulfilledResult<string> =>
+              r.status === 'fulfilled' && typeof r.value === 'string')
+            .map(r => r.value);
           resolve({ success: true, paths });
         };
         input.click();

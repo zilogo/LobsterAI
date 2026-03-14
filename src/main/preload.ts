@@ -223,6 +223,15 @@ contextBridge.exposeInMainWorld('electron', {
       return () => ipcRenderer.removeListener('cowork:stream:error', handler);
     },
   },
+  files: {
+    list: (dirPath: string) => ipcRenderer.invoke('files:list', dirPath),
+    upload: (options: { dataBase64: string; fileName: string; targetDir: string; mimeType?: string }) =>
+      ipcRenderer.invoke('files:upload', options),
+    download: (filePath: string) => ipcRenderer.invoke('files:download', filePath),
+    delete: (targetPath: string) => ipcRenderer.invoke('files:delete', targetPath),
+    mkdir: (dirPath: string) => ipcRenderer.invoke('files:mkdir', dirPath),
+    rename: (oldPath: string, newPath: string) => ipcRenderer.invoke('files:rename', oldPath, newPath),
+  },
   dialog: {
     selectDirectory: () => ipcRenderer.invoke('dialog:selectDirectory'),
     selectFile: (options?: { title?: string; filters?: { name: string; extensions: string[] }[] }) =>
