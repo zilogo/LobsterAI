@@ -1,5 +1,7 @@
 import { join } from 'path';
-import { app } from 'electron';
+
+let app: { isPackaged: boolean; getPath: (name: string) => string; getAppPath: () => string } | null = null;
+try { app = require('electron').app; } catch { app = null; }
 import type { SqliteStore } from '../sqliteStore';
 import type { CoworkApiConfig } from './coworkConfigStore';
 import {
@@ -62,7 +64,7 @@ const getStore = (): SqliteStore | null => {
 };
 
 export function getClaudeCodePath(): string {
-  if (app.isPackaged) {
+  if (app?.isPackaged) {
     return join(
       process.resourcesPath,
       'app.asar.unpacked/node_modules/@anthropic-ai/claude-agent-sdk/cli.js'
@@ -72,7 +74,7 @@ export function getClaudeCodePath(): string {
   // In development, try to find the SDK in the project root node_modules
   // app.getAppPath() might point to dist-electron or other build output directories
   // We need to look in the project root
-  const appPath = app.getAppPath();
+  const appPath = app?.getAppPath() ?? process.cwd();
   // If appPath ends with dist-electron, go up one level
   const rootDir = appPath.endsWith('dist-electron') 
     ? join(appPath, '..') 

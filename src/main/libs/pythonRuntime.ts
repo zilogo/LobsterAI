@@ -1,4 +1,6 @@
-import { app } from 'electron';
+import os from 'os';
+let app: { isPackaged: boolean; getPath: (name: string) => string; getAppPath: () => string } | null = null;
+try { app = require('electron').app; } catch { app = null; }
 import { spawnSync } from 'child_process';
 import fs from 'fs';
 import path from 'path';
@@ -193,10 +195,10 @@ function ensureRuntimeStateFile(runtimeRoot: string, sourceRoot: string): void {
 }
 
 function resolveBundledCandidates(): string[] {
-  if (app.isPackaged) {
+  if (app?.isPackaged) {
     return [
       path.join(process.resourcesPath, PYTHON_RUNTIME_DIR_NAME),
-      path.join(app.getAppPath(), PYTHON_RUNTIME_DIR_NAME),
+      path.join((app?.getAppPath() ?? process.cwd()), PYTHON_RUNTIME_DIR_NAME),
     ];
   }
 
@@ -204,7 +206,7 @@ function resolveBundledCandidates(): string[] {
   return [
     path.join(projectRoot, 'resources', PYTHON_RUNTIME_DIR_NAME),
     path.join(process.cwd(), 'resources', PYTHON_RUNTIME_DIR_NAME),
-    path.join(app.getAppPath(), 'resources', PYTHON_RUNTIME_DIR_NAME),
+    path.join((app?.getAppPath() ?? process.cwd()), 'resources', PYTHON_RUNTIME_DIR_NAME),
   ];
 }
 
@@ -219,7 +221,7 @@ export function getBundledPythonRoot(): string | null {
 }
 
 export function getUserPythonRoot(): string {
-  return path.join(app.getPath('userData'), 'runtimes', PYTHON_RUNTIME_DIR_NAME);
+  return path.join(app?.getPath('userData') ?? path.join(os.homedir(), '.lobsterai'), 'runtimes', PYTHON_RUNTIME_DIR_NAME);
 }
 
 export function appendPythonRuntimeToEnv(env: Record<string, string | undefined>): Record<string, string | undefined> {

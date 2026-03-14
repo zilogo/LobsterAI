@@ -1,4 +1,7 @@
-import { app } from 'electron';
+import os from 'os';
+
+let app: { isPackaged: boolean; getPath: (name: string) => string; getAppPath: () => string } | null = null;
+try { app = require('electron').app; } catch { app = null; }
 import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from 'fs';
 import { join } from 'path';
 
@@ -14,7 +17,7 @@ export type CoworkApiConfig = {
 const CONFIG_FILE_NAME = 'api-config.json';
 
 function getConfigPath(): string {
-  const userDataPath = app.getPath('userData');
+  const userDataPath = app?.getPath('userData') ?? join(os.homedir(), '.lobsterai');
   return join(userDataPath, CONFIG_FILE_NAME);
 }
 
@@ -45,7 +48,7 @@ export function loadCoworkApiConfig(): CoworkApiConfig | null {
 
 export function saveCoworkApiConfig(config: CoworkApiConfig): void {
   const configPath = getConfigPath();
-  const userDataPath = app.getPath('userData');
+  const userDataPath = app?.getPath('userData') ?? join(os.homedir(), '.lobsterai');
 
   if (!existsSync(userDataPath)) {
     mkdirSync(userDataPath, { recursive: true });

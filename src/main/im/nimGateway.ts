@@ -8,8 +8,9 @@ import { EventEmitter } from 'events';
 import * as path from 'path';
 import * as os from 'os';
 import * as fs from 'fs';
-import { app } from 'electron';
-// eslint-disable-next-line @typescript-eslint/no-require-imports
+// Conditional Electron import for testability outside Electron
+let app: { getPath: (name: string) => string } | null = null;
+try { app = require('electron').app; } catch { app = null; }
 const NIM = require('nim-web-sdk-ng/dist/nodejs/nim.js').default;
 import type { V2NIM } from 'nim-web-sdk-ng/dist/nodejs/nim';
 import { APP_ID } from '../appConstants';
@@ -103,7 +104,7 @@ function buildConversationId(conversationIdUtil: any, accountId: string, session
 function getSdkDataPath(account: string): string {
   let baseDir: string;
   try {
-    baseDir = app.getPath('userData');
+    baseDir = app?.getPath('userData') ?? path.join(os.homedir(), `.${APP_ID}`);
   } catch {
     baseDir = path.join(os.homedir(), `.${APP_ID}`);
   }

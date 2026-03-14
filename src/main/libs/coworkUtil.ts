@@ -1,4 +1,7 @@
-import { app } from 'electron';
+import os from 'os';
+
+let app: { isPackaged: boolean; getPath: (name: string) => string; getAppPath: () => string; getName: () => string } | null = null;
+try { app = require('electron').app; } catch { app = null; }
 import { execSync, spawnSync } from 'child_process';
 import { existsSync, mkdirSync, writeFileSync, chmodSync, statSync, readdirSync } from 'fs';
 import { delimiter, dirname, join } from 'path';
@@ -47,12 +50,12 @@ function hasCommandInEnv(command: string, env: Record<string, string | undefined
 let cachedElectronNodeRuntimePath: string | null = null;
 
 function resolveElectronNodeRuntimePath(): string {
-  if (!app.isPackaged || process.platform !== 'darwin') {
+  if (!app?.isPackaged || process.platform !== 'darwin') {
     return process.execPath;
   }
 
   try {
-    const appName = app.getName();
+    const appName = app?.getName() ?? 'LobsterAI';
     const frameworksDir = join(process.resourcesPath, '..', 'Frameworks');
     if (!existsSync(frameworksDir)) {
       return process.execPath;
@@ -312,7 +315,7 @@ function listGitInstallPathsFromRegistry(): string[] {
 }
 
 function getBundledGitBashCandidates(): string[] {
-  const bundledRoots = app.isPackaged
+  const bundledRoots = app?.isPackaged
     ? [join(process.resourcesPath, 'mingit')]
     : [
       join(__dirname, '..', '..', 'resources', 'mingit'),
@@ -442,7 +445,7 @@ function getWindowsGitToolDirs(bashPath: string): string[] {
 
 function ensureElectronNodeShim(electronPath: string, npmBinDir?: string): string | null {
   try {
-    const shimDir = join(app.getPath('userData'), 'cowork', 'bin');
+    const shimDir = join(app?.getPath('userData') ?? join(os.homedir(), '.lobsterai'), 'cowork', 'bin');
     mkdirSync(shimDir, { recursive: true });
     coworkLog('INFO', 'resolveNodeShim', `Shim directory: ${shimDir}, electronPath: ${electronPath}, npmBinDir: ${npmBinDir || '(none)'}`);
 
@@ -923,7 +926,7 @@ function ensureWindowsOriginalPath(env: Record<string, string | undefined>): voi
  */
 function ensureWindowsBashUtf8InitScript(): string | null {
   try {
-    const initDir = join(app.getPath('userData'), 'cowork', 'bin');
+    const initDir = join(app?.getPath('userData') ?? join(os.homedir(), '.lobsterai'), 'cowork', 'bin');
     mkdirSync(initDir, { recursive: true });
 
     const initScript = join(initDir, 'bash_utf8_init.sh');
@@ -954,7 +957,7 @@ function ensureWindowsBashUtf8InitScript(): string | null {
 function applyPackagedEnvOverrides(env: Record<string, string | undefined>): void {
   const electronNodeRuntimePath = getElectronNodeRuntimePath();
 
-  if (app.isPackaged && !env.LOBSTERAI_ELECTRON_PATH) {
+  if (app?.isPackaged && !env.LOBSTERAI_ELECTRON_PATH) {
     env.LOBSTERAI_ELECTRON_PATH = electronNodeRuntimePath;
   }
 
@@ -1097,10 +1100,10 @@ function applyPackagedEnvOverrides(env: Record<string, string | undefined>): voi
     ensureWindowsOriginalPath(env);
   }
 
-  if (!app.isPackaged) {
+  if (!app?.isPackaged) {
     // In dev mode, prepend project's node_modules/.bin to PATH so bundled
     // npx/npm are found even if the user has no global Node.js installation.
-    const devBinDir = join(app.getAppPath(), 'node_modules', '.bin');
+    const devBinDir = join(app?.getAppPath() ?? process.cwd(), 'node_modules', '.bin');
     if (existsSync(devBinDir)) {
       env.PATH = [devBinDir, env.PATH].filter(Boolean).join(delimiter);
       coworkLog('INFO', 'applyPackagedEnvOverrides', `Dev mode: prepended node_modules/.bin to PATH: ${devBinDir}`);
@@ -1109,7 +1112,7 @@ function applyPackagedEnvOverrides(env: Record<string, string | undefined>): voi
   }
 
   if (!env.HOME) {
-    env.HOME = app.getPath('home');
+    env.HOME = app?.getPath('home') ?? os.homedir();
   }
 
   // Resolve user's shell PATH so that node, npm, and other tools are findable
@@ -1122,7 +1125,7 @@ function applyPackagedEnvOverrides(env: Record<string, string | undefined>): voi
     }
   } else {
     // Fallback: append common node installation paths
-    const home = env.HOME || app.getPath('home');
+    const home = env.HOME || app?.getPath('home') || os.homedir();
     const commonPaths = [
       '/usr/local/bin',
       '/opt/homebrew/bin',
@@ -1151,7 +1154,7 @@ function applyPackagedEnvOverrides(env: Record<string, string | undefined>): voi
   const hasSystemNode = hasCommandInEnv('node', env);
   const hasSystemNpx = hasCommandInEnv('npx', env);
   const hasSystemNpm = hasCommandInEnv('npm', env);
-  const shouldForcePackagedDarwinShim = app.isPackaged && process.platform === 'darwin';
+  const shouldForcePackagedDarwinShim = !!app?.isPackaged && process.platform === 'darwin';
   const shouldInjectShim = shouldForcePackagedDarwinShim
     || process.platform === 'win32'
     || !(hasSystemNode && hasSystemNpx && hasSystemNpm);
@@ -1270,7 +1273,7 @@ function verifyNodeEnvironment(env: Record<string, string | undefined>): void {
  * Get SKILLs directory path (handles both development and production)
  */
 export function getSkillsRoot(): string {
-  if (app.isPackaged) {
+  if (app?.isPackaged) {
     // In production, SKILLs are copied to userData
     return join(app.getPath('userData'), 'SKILLs');
   }
@@ -1282,7 +1285,7 @@ export function getSkillsRoot(): string {
     .filter((value): value is string => Boolean(value));
   const candidates = [
     ...envRoots,
-    join(app.getAppPath(), 'SKILLs'),
+    join(app?.getAppPath() ?? process.cwd(), 'SKILLs'),
     join(process.cwd(), 'SKILLs'),
     join(__dirname, '..', 'SKILLs'),
     join(__dirname, '..', '..', 'SKILLs'),
@@ -1295,7 +1298,7 @@ export function getSkillsRoot(): string {
   }
 
   // Final fallback for first-run dev environments where SKILLs may not exist yet.
-  return join(app.getAppPath(), 'SKILLs');
+  return join(app?.getAppPath() ?? process.cwd(), 'SKILLs');
 }
 
 /**
@@ -1472,6 +1475,15 @@ function normalizeTitleToPlainText(value: string, fallback: string): string {
   if (!value.trim()) return fallback;
 
   let title = value.trim();
+
+  // Strip <think>...</think> blocks (e.g. MiniMax reasoning tags).
+  // Also handle unclosed <think> (truncated by max_tokens) and stray </think>.
+  title = title
+    .replace(/<think>[\s\S]*?<\/think>/gi, '')
+    .replace(/<think>[\s\S]*/gi, '')
+    .replace(/[\s\S]*<\/think>/gi, '')
+    .trim();
+
   const fenced = /```(?:[\w-]+)?\s*([\s\S]*?)```/i.exec(title);
   if (fenced?.[1]) {
     title = fenced[1].trim();

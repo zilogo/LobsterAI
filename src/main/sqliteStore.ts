@@ -1,4 +1,11 @@
-import { app } from 'electron';
+// Conditional Electron import — allows this module to run in both Electron and Node.js (Web server).
+let app: { isPackaged: boolean; getPath: (name: string) => string; getAppPath: () => string } | null = null;
+try {
+  app = require('electron').app;
+} catch {
+  app = null;
+}
+
 import { EventEmitter } from 'events';
 import crypto from 'crypto';
 import fs from 'fs';
@@ -19,12 +26,18 @@ const USER_MEMORIES_MIGRATION_KEY = 'userMemories.migration.v1.completed';
 // and passing the buffer directly to initSqlJs bypasses Emscripten's file loading,
 // which can fail or hang when the install path contains Chinese characters on Windows.
 function loadWasmBinary(): ArrayBuffer {
-  const wasmPath = app.isPackaged
-    ? path.join(
-        process.resourcesPath,
-        'app.asar.unpacked/node_modules/sql.js/dist/sql-wasm.wasm'
-      )
-    : path.join(app.getAppPath(), 'node_modules/sql.js/dist/sql-wasm.wasm');
+  let wasmPath: string;
+  if (app && app.isPackaged) {
+    wasmPath = path.join(
+      process.resourcesPath,
+      'app.asar.unpacked/node_modules/sql.js/dist/sql-wasm.wasm'
+    );
+  } else if (app) {
+    wasmPath = path.join(app.getAppPath(), 'node_modules/sql.js/dist/sql-wasm.wasm');
+  } else {
+    // Web server mode — resolve from project root
+    wasmPath = path.join(process.cwd(), 'node_modules/sql.js/dist/sql-wasm.wasm');
+  }
   const buf = fs.readFileSync(wasmPath);
   return buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.byteLength);
 }
@@ -41,7 +54,7 @@ export class SqliteStore {
   }
 
   static async create(userDataPath?: string): Promise<SqliteStore> {
-    const basePath = userDataPath ?? app.getPath('userData');
+    const basePath = userDataPath ?? (app ? app.getPath('userData') : process.cwd());
     const dbPath = path.join(basePath, DB_FILENAME);
 
     // Initialize SQL.js with WASM file path (cached promise for reuse)
@@ -374,11 +387,12 @@ export class SqliteStore {
   }
 
   private tryReadLegacyMemoryText(): string {
+    const appPath = app?.getAppPath?.() ?? process.cwd();
     const candidates = [
       path.join(process.cwd(), 'MEMORY.md'),
-      path.join(app.getAppPath(), 'MEMORY.md'),
+      path.join(appPath, 'MEMORY.md'),
       path.join(process.cwd(), 'memory.md'),
-      path.join(app.getAppPath(), 'memory.md'),
+      path.join(appPath, 'memory.md'),
     ];
 
     for (const candidate of candidates) {

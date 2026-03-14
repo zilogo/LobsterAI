@@ -1,6 +1,9 @@
-import { app } from 'electron';
 import fs from 'fs';
+import os from 'os';
 import path from 'path';
+
+let app: { isPackaged: boolean; getPath: (name: string) => string; getAppPath: () => string } | null = null;
+try { app = require('electron').app; } catch { app = null; }
 
 const MAX_LOG_SIZE = 5 * 1024 * 1024; // 5MB
 
@@ -8,7 +11,7 @@ let logFilePath: string | null = null;
 
 function getLogFilePath(): string {
   if (!logFilePath) {
-    const logDir = path.join(app.getPath('userData'), 'logs');
+    const logDir = path.join(app?.getPath('userData') ?? path.join(os.homedir(), '.lobsterai'), 'logs');
     if (!fs.existsSync(logDir)) {
       fs.mkdirSync(logDir, { recursive: true });
     }

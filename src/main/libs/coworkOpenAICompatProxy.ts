@@ -1,5 +1,8 @@
 import http from 'http';
-import { BrowserWindow, session } from 'electron';
+let BrowserWindow: { getAllWindows: () => Array<{ isDestroyed: () => boolean; webContents: { send: (channel: string, ...args: unknown[]) => void } }> } | null = null;
+try { BrowserWindow = require('electron').BrowserWindow; } catch { BrowserWindow = null; }
+let session: { defaultSession: { fetch: (url: string, init?: RequestInit) => Promise<Response> } } | null = null;
+try { session = require('electron').session; } catch { session = null; }
 import {
   anthropicToOpenAI,
   buildOpenAIChatCompletionsURL,
@@ -44,6 +47,10 @@ type StreamState = {
   hasMessageStart: boolean;
   hasMessageStop: boolean;
   toolCalls: Record<number, ToolCallState>;
+  /** Track whether we are inside an inline `<think>` text tag (used by models like MiniMax/DeepSeek). */
+  insideThinkTag: boolean;
+  /** Buffer for partial `<think>` or `</think>` tag detection across chunk boundaries. */
+  thinkTagBuffer: string;
 };
 
 type UpstreamAPIType = 'chat_completions' | 'responses';
@@ -1063,6 +1070,8 @@ function createStreamState(): StreamState {
     hasMessageStart: false,
     hasMessageStop: false,
     toolCalls: {},
+    insideThinkTag: false,
+    thinkTagBuffer: '',
   };
 }
 
@@ -1324,6 +1333,123 @@ function ensureTextBlock(res: http.ServerResponse, state: StreamState): void {
   state.currentBlockType = 'text';
 }
 
+/**
+ * Parse inline `<think>` / `</think>` tags from streaming content chunks.
+ * Models like MiniMax/DeepSeek embed reasoning inside these text tags
+ * instead of using the structured `reasoning_content` field.
+ * This function splits the content and emits thinking_delta vs text_delta accordingly.
+ */
+function emitContentWithThinkTagParsing(
+  res: http.ServerResponse,
+  state: StreamState,
+  content: string
+): void {
+  // Prepend any buffered partial tag content
+  let text = state.thinkTagBuffer + content;
+  state.thinkTagBuffer = '';
+
+  while (text.length > 0) {
+    if (state.insideThinkTag) {
+      // Look for closing </think> tag
+      const closeIdx = text.indexOf('</think>');
+      if (closeIdx === -1) {
+        // Check for partial closing tag at the end (e.g., "</thi")
+        const partialMatch = findPartialSuffix(text, '</think>');
+        if (partialMatch > 0) {
+          const safe = text.slice(0, text.length - partialMatch);
+          state.thinkTagBuffer = text.slice(text.length - partialMatch);
+          if (safe.length > 0) {
+            ensureThinkingBlock(res, state);
+            emitSSE(res, 'content_block_delta', {
+              type: 'content_block_delta',
+              index: state.contentIndex,
+              delta: { type: 'thinking_delta', thinking: safe },
+            });
+          }
+        } else {
+          // All content is thinking
+          ensureThinkingBlock(res, state);
+          emitSSE(res, 'content_block_delta', {
+            type: 'content_block_delta',
+            index: state.contentIndex,
+            delta: { type: 'thinking_delta', thinking: text },
+          });
+        }
+        break;
+      } else {
+        // Emit thinking content before </think>
+        const thinkContent = text.slice(0, closeIdx);
+        if (thinkContent.length > 0) {
+          ensureThinkingBlock(res, state);
+          emitSSE(res, 'content_block_delta', {
+            type: 'content_block_delta',
+            index: state.contentIndex,
+            delta: { type: 'thinking_delta', thinking: thinkContent },
+          });
+        }
+        state.insideThinkTag = false;
+        text = text.slice(closeIdx + '</think>'.length);
+      }
+    } else {
+      // Look for opening <think> tag
+      const openIdx = text.indexOf('<think>');
+      if (openIdx === -1) {
+        // Check for partial opening tag at the end (e.g., "<thin")
+        const partialMatch = findPartialSuffix(text, '<think>');
+        if (partialMatch > 0) {
+          const safe = text.slice(0, text.length - partialMatch);
+          state.thinkTagBuffer = text.slice(text.length - partialMatch);
+          if (safe.length > 0) {
+            ensureTextBlock(res, state);
+            emitSSE(res, 'content_block_delta', {
+              type: 'content_block_delta',
+              index: state.contentIndex,
+              delta: { type: 'text_delta', text: safe },
+            });
+          }
+        } else {
+          // All content is regular text
+          ensureTextBlock(res, state);
+          emitSSE(res, 'content_block_delta', {
+            type: 'content_block_delta',
+            index: state.contentIndex,
+            delta: { type: 'text_delta', text },
+          });
+        }
+        break;
+      } else {
+        // Emit text content before <think>
+        const textContent = text.slice(0, openIdx);
+        if (textContent.length > 0) {
+          ensureTextBlock(res, state);
+          emitSSE(res, 'content_block_delta', {
+            type: 'content_block_delta',
+            index: state.contentIndex,
+            delta: { type: 'text_delta', text: textContent },
+          });
+        }
+        state.insideThinkTag = true;
+        text = text.slice(openIdx + '<think>'.length);
+      }
+    }
+  }
+}
+
+/**
+ * Find the length of the longest suffix of `text` that is a prefix of `tag`.
+ * Used to detect partial tags at chunk boundaries.
+ * e.g. findPartialSuffix("hello</thi", "</think>") => 5  ("</thi")
+ */
+function findPartialSuffix(text: string, tag: string): number {
+  const maxLen = Math.min(text.length, tag.length - 1);
+  for (let len = maxLen; len >= 1; len--) {
+    if (text.endsWith(tag.slice(0, len))) {
+      return len;
+    }
+  }
+  return 0;
+}
+
 function ensureToolUseBlock(
   res: http.ServerResponse,
   state: StreamState,
@@ -1408,15 +1534,7 @@ function processOpenAIChunk(
   }
 
   if (delta?.content) {
-    ensureTextBlock(res, state);
-    emitSSE(res, 'content_block_delta', {
-      type: 'content_block_delta',
-      index: state.contentIndex,
-      delta: {
-        type: 'text_delta',
-        text: delta.content,
-      },
-    });
+    emitContentWithThinkTagParsing(res, state, delta.content);
   }
 
   if (Array.isArray(delta?.tool_calls)) {
@@ -2264,7 +2382,7 @@ async function handleCreateScheduledTask(
     scheduledTaskDeps.getScheduler().reschedule();
 
     // Notify renderer to refresh task list
-    for (const win of BrowserWindow.getAllWindows()) {
+    for (const win of BrowserWindow?.getAllWindows() ?? []) {
       win.webContents.send('scheduledTask:statusUpdate', {
         taskId: task.id,
         state: task.state,
@@ -2401,7 +2519,7 @@ async function handleUpdateScheduledTask(
     scheduledTaskDeps.getScheduler().reschedule();
 
     // Notify renderer to refresh task list
-    for (const win of BrowserWindow.getAllWindows()) {
+    for (const win of BrowserWindow?.getAllWindows() ?? []) {
       win.webContents.send('scheduledTask:statusUpdate', {
         taskId: task.id,
         state: task.state,
@@ -2437,7 +2555,7 @@ async function handleDeleteScheduledTask(
     scheduledTaskDeps.getScheduler().reschedule();
 
     // Notify renderer to refresh task list
-    for (const win of BrowserWindow.getAllWindows()) {
+    for (const win of BrowserWindow?.getAllWindows() ?? []) {
       win.webContents.send('scheduledTask:statusUpdate', {
         taskId: id,
         state: null,
@@ -2492,7 +2610,7 @@ async function handleToggleScheduledTask(
     scheduledTaskDeps.getScheduler().reschedule();
 
     // Notify renderer to refresh task list
-    for (const win of BrowserWindow.getAllWindows()) {
+    for (const win of BrowserWindow?.getAllWindows() ?? []) {
       win.webContents.send('scheduledTask:statusUpdate', {
         taskId: task.id,
         state: task.state,
@@ -2668,7 +2786,8 @@ async function handleRequest(
   ): Promise<Response> => {
     currentTargetURL = targetURL;
     console.log(`[CoworkProxy] Sending upstream request to: ${targetURL}`);
-    return session.defaultSession.fetch(targetURL, {
+    const fetchFn = session?.defaultSession?.fetch ?? globalThis.fetch;
+    return fetchFn(targetURL, {
       method: 'POST',
       headers,
       body: JSON.stringify(payload),

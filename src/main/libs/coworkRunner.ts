@@ -1,7 +1,9 @@
 import { EventEmitter } from 'events';
 import { type ChildProcessByStdio, spawn, spawnSync } from 'child_process';
-import { app } from 'electron';
+let app: { isPackaged: boolean; getPath: (name: string) => string; getAppPath: () => string } | null = null;
+try { app = require('electron').app; } catch { app = null; }
 import fs from 'fs';
+import os from 'os';
 import path from 'path';
 import type { Readable } from 'stream';
 import { StringDecoder } from 'string_decoder';
@@ -183,7 +185,7 @@ function ensureWindowsChildProcessHideInitScript(): string | null {
   }
 
   try {
-    const initDir = path.join(app.getPath('userData'), 'cowork', 'bin');
+    const initDir = path.join(app?.getPath('userData') ?? path.join(os.homedir(), '.lobsterai'), 'cowork', 'bin');
     fs.mkdirSync(initDir, { recursive: true });
     const initScriptPath = path.join(initDir, WINDOWS_HIDE_INIT_SCRIPT_NAME);
 
@@ -1008,7 +1010,7 @@ export class CoworkRunner extends EventEmitter {
     }
     pushCandidate(getSkillsRoot());
 
-    if (app.isPackaged) {
+    if (app?.isPackaged) {
       pushCandidate(path.join(process.resourcesPath, 'SKILLs'));
       pushCandidate(path.join(process.resourcesPath, 'skills'));
       pushCandidate(path.join(app.getAppPath(), 'SKILLs'));
@@ -2843,7 +2845,7 @@ export class CoworkRunner extends EventEmitter {
     let stderrTail = '';
 
     // Log MCP-relevant environment for debugging
-    coworkLog('INFO', 'runClaudeCodeLocal', `MCP env: isPackaged=${app.isPackaged}, platform=${process.platform}, arch=${process.arch}`);
+    coworkLog('INFO', 'runClaudeCodeLocal', `MCP env: isPackaged=${app?.isPackaged ?? false}, platform=${process.platform}, arch=${process.arch}`);
     coworkLog('INFO', 'runClaudeCodeLocal', `MCP env: LOBSTERAI_ELECTRON_PATH=${envVars.LOBSTERAI_ELECTRON_PATH || '(not set)'}`);
     coworkLog('INFO', 'runClaudeCodeLocal', `MCP env: ELECTRON_RUN_AS_NODE=${envVars.ELECTRON_RUN_AS_NODE || '(not set)'}`);
     coworkLog('INFO', 'runClaudeCodeLocal', `MCP env: NODE_PATH=${envVars.NODE_PATH || '(not set)'}`);
@@ -2862,7 +2864,7 @@ export class CoworkRunner extends EventEmitter {
     // child_process.fork() uses process.execPath by default, so without
     // ELECTRON_RUN_AS_NODE the SDK would launch another Electron app instance
     // instead of running cli.js as a Node script, causing exit code 1.
-    if (app.isPackaged) {
+    if (app?.isPackaged) {
       envVars.ELECTRON_RUN_AS_NODE = '1';
     }
 
@@ -3002,7 +3004,7 @@ export class CoworkRunner extends EventEmitter {
       },
     };
 
-    if (app.isPackaged) {
+    if (app?.isPackaged) {
       // The SDK's default ProcessTransport uses child_process.fork() and may
       // relaunch the Electron app binary on some macOS installs. Override the
       // process spawner to force Node-mode execution via Electron directly.
@@ -3013,7 +3015,7 @@ export class CoworkRunner extends EventEmitter {
         env?: NodeJS.ProcessEnv;
         signal?: AbortSignal;
       }) => {
-        const isPackagedDarwin = app.isPackaged && process.platform === 'darwin';
+        const isPackagedDarwin = app?.isPackaged && process.platform === 'darwin';
         const useElectronShim =
           process.platform === 'win32'
           || isPackagedDarwin
@@ -3119,7 +3121,7 @@ export class CoworkRunner extends EventEmitter {
         cwd,
         claudeCodePath,
         claudeCodePathExists: fs.existsSync(claudeCodePath),
-        isPackaged: app.isPackaged,
+        isPackaged: app?.isPackaged ?? false,
         resourcesPath: process.resourcesPath,
         processExecPath: process.execPath,
         platform: process.platform,
@@ -3271,7 +3273,7 @@ export class CoworkRunner extends EventEmitter {
                     ? { ...server.env }
                     : undefined;
 
-                  if (process.platform === 'win32' && app.isPackaged && effectiveStdioCommand) {
+                  if (process.platform === 'win32' && app?.isPackaged && effectiveStdioCommand) {
                     const normalizedCommand = effectiveStdioCommand.trim().toLowerCase();
                     const npmBinDir = envVars.LOBSTERAI_NPM_BIN_DIR;
                     const npxCliJs = npmBinDir ? path.join(npmBinDir, 'npx-cli.js') : '';
@@ -3321,7 +3323,7 @@ export class CoworkRunner extends EventEmitter {
                     coworkLog('INFO', 'runClaudeCodeLocal', `MCP "${serverKey}": injected Windows hidden-subprocess preload`);
                   }
 
-                  if (app.isPackaged && process.platform === 'darwin' && stdioCommand && path.isAbsolute(stdioCommand)) {
+                  if (app?.isPackaged && process.platform === 'darwin' && stdioCommand && path.isAbsolute(stdioCommand)) {
                     const commandCandidates = new Set<string>([stdioCommand, path.resolve(stdioCommand)]);
                     const appExecCandidates = new Set<string>([
                       process.execPath,

@@ -4,8 +4,12 @@
  */
 import * as fs from 'fs';
 import * as path from 'path';
-import { app } from 'electron';
+import * as os from 'os';
 import { fetchWithSystemProxy } from './http';
+
+// Conditional Electron import for testability outside Electron
+let app: { getPath: (name: string) => string } | null = null;
+try { app = require('electron').app; } catch { app = null; }
 import type { IMMediaType } from './types';
 
 const DINGTALK_API = 'https://api.dingtalk.com';
@@ -16,7 +20,7 @@ const INBOUND_DIR = 'dingtalk-inbound';
  * 获取钉钉媒体存储目录
  */
 export function getDingtalkMediaDir(): string {
-  const userDataPath = app.getPath('userData');
+  const userDataPath = app?.getPath('userData') ?? path.join(os.homedir(), '.lobsterai');
   const mediaDir = path.join(userDataPath, INBOUND_DIR);
 
   if (!fs.existsSync(mediaDir)) {

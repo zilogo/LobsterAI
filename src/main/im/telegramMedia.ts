@@ -4,8 +4,12 @@
  */
 import * as fs from 'fs';
 import * as path from 'path';
-import { app } from 'electron';
+import * as os from 'os';
 import type { Context } from 'grammy';
+
+// Conditional Electron import for testability outside Electron
+let app: { getPath: (name: string) => string } | null = null;
+try { app = require('electron').app; } catch { app = null; }
 import type { IMMediaAttachment } from './types';
 import { fetchWithSystemProxy } from './http';
 
@@ -17,7 +21,7 @@ const INBOUND_DIR = 'telegram-inbound';
  * 获取媒体存储目录
  */
 export function getTelegramMediaDir(): string {
-  const userDataPath = app.getPath('userData');
+  const userDataPath = app?.getPath('userData') ?? path.join(os.homedir(), '.lobsterai');
   const mediaDir = path.join(userDataPath, INBOUND_DIR);
 
   if (!fs.existsSync(mediaDir)) {

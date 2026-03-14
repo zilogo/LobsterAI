@@ -1,4 +1,7 @@
-import { app, session } from 'electron';
+// Conditional Electron import for Web server compatibility
+let app: { isPackaged: boolean; getPath: (name: string) => string; getAppPath: () => string } | null = null;
+let session: { defaultSession: { fetch: typeof globalThis.fetch } } | null = null;
+try { const electron = require('electron'); app = electron.app; session = electron.session; } catch { app = null; session = null; }
 import { createHash } from 'crypto';
 import { EventEmitter } from 'events';
 import fs from 'fs';
@@ -120,7 +123,8 @@ function getRuntimeBinaryName(): string {
 }
 
 function getSandboxPaths() {
-  const baseDir = path.join(app.getPath('userData'), 'cowork', 'sandbox');
+  const os = require('os');
+  const baseDir = path.join(app?.getPath('userData') ?? path.join(os.homedir(), '.lobsterai'), 'cowork', 'sandbox');
   const runtimeDir = path.join(baseDir, 'runtime', `${SANDBOX_RUNTIME_VERSION}`);
   const imageDir = path.join(baseDir, 'images', `${SANDBOX_IMAGE_VERSION}`);
   const runtimeBinary = path.join(runtimeDir, getRuntimeBinaryName());
@@ -235,7 +239,8 @@ function getInitrdPathOverride(): string | null {
 }
 
 async function downloadFile(url: string, destination: string, stage: CoworkSandboxProgress['stage']): Promise<void> {
-  const response = await session.defaultSession.fetch(url);
+  const fetchFn = session?.defaultSession?.fetch ?? globalThis.fetch;
+  const response = await fetchFn(url);
   if (!response.ok) {
     throw new Error(`Download failed (${response.status}): ${url}`);
   }

@@ -1,4 +1,6 @@
-import { app } from 'electron';
+import os from 'os';
+let app: { getPath: (name: string) => string } | null = null;
+try { app = require('electron').app; } catch { app = null; }
 import { spawn, type ChildProcessByStdio } from 'child_process';
 import fs from 'fs';
 import net from 'net';
@@ -37,7 +39,7 @@ export type SandboxExtraMount = {
 };
 
 export function ensureCoworkSandboxDirs(sessionId: string): CoworkSandboxPaths {
-  const baseDir = path.join(app.getPath('userData'), 'cowork', 'sandbox');
+  const baseDir = path.join(app?.getPath('userData') ?? path.join(os.homedir(), '.lobsterai'), 'cowork', 'sandbox');
   const ipcDir = path.join(baseDir, 'ipc', sessionId);
   const requestsDir = path.join(ipcDir, 'requests');
   const responsesDir = path.join(ipcDir, 'responses');

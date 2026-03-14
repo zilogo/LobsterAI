@@ -1,4 +1,5 @@
-import { app } from 'electron';
+let app: { isPackaged: boolean; getPath: (name: string) => string; getAppPath: () => string } | null = null;
+try { app = require('electron').app; } catch { app = null; }
 import crypto from 'crypto';
 import fs from 'fs';
 import os from 'os';
@@ -441,7 +442,7 @@ const getDefaultSystemPrompt = (): string => {
   }
 
   try {
-    const promptPath = path.join(app.getAppPath(), 'sandbox', 'agent-runner', 'AGENT_SYSTEM_PROMPT.md');
+    const promptPath = path.join(app?.getAppPath() ?? process.cwd(), 'sandbox', 'agent-runner', 'AGENT_SYSTEM_PROMPT.md');
     cachedDefaultSystemPrompt = fs.readFileSync(promptPath, 'utf-8');
   } catch (error) {
     console.warn('Failed to load default system prompt:', error);

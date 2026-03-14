@@ -10,8 +10,9 @@ import { EventEmitter } from 'events';
 import * as path from 'path';
 import * as os from 'os';
 import * as fs from 'fs';
-import { app } from 'electron';
-// eslint-disable-next-line @typescript-eslint/no-require-imports
+// Conditional Electron import for testability outside Electron
+let app: { getPath: (name: string) => string } | null = null;
+try { app = require('electron').app; } catch { app = null; }
 const NIM = require('nim-web-sdk-ng/dist/nodejs/nim.js').default;
 import type { V2NIM } from 'nim-web-sdk-ng/dist/nodejs/nim';
 import {
@@ -119,7 +120,7 @@ function parseConversationId(conversationId: string): { sessionType: 'p2p' | 'te
 function getSdkDataPath(account: string): string {
   let baseDir: string;
   try {
-    baseDir = app.getPath('userData');
+    baseDir = app?.getPath('userData') ?? path.join(os.homedir(), '.lobsterai');
   } catch {
     baseDir = path.join(os.homedir(), '.lobsterai');
   }
@@ -205,7 +206,7 @@ export class XiaomifengGateway extends EventEmitter {
    */
   private initStatePersistence(): void {
     try {
-      const userDataPath = app.getPath('userData');
+      const userDataPath = app?.getPath('userData') ?? path.join(os.homedir(), '.lobsterai');
       this.stateFilePath = path.join(userDataPath, STATE_FILE_NAME);
       this.loadPersistedState();
     } catch {

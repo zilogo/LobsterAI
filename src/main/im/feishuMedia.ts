@@ -5,8 +5,12 @@
 import { Readable } from 'stream';
 import * as fs from 'fs';
 import * as path from 'path';
-import { app } from 'electron';
+import * as os from 'os';
 import type { IMMediaType } from './types';
+
+// Conditional Electron import for testability outside Electron
+let app: { getPath: (name: string) => string } | null = null;
+try { app = require('electron').app; } catch { app = null; }
 
 // Types
 export type FeishuFileType = 'opus' | 'mp4' | 'pdf' | 'doc' | 'xls' | 'ppt' | 'stream';
@@ -224,7 +228,7 @@ const INBOUND_DIR = 'feishu-inbound';
  * 获取飞书媒体存储目录
  */
 export function getFeishuMediaDir(): string {
-  const userDataPath = app.getPath('userData');
+  const userDataPath = app?.getPath('userData') ?? path.join(os.homedir(), '.lobsterai');
   const mediaDir = path.join(userDataPath, INBOUND_DIR);
 
   if (!fs.existsSync(mediaDir)) {

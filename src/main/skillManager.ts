@@ -1,4 +1,11 @@
-import { app, BrowserWindow, session } from 'electron';
+import os from 'os';
+
+let app: { isPackaged: boolean; getPath: (name: string) => string; getAppPath: () => string } | null = null;
+try { app = require('electron').app; } catch { app = null; }
+let BrowserWindow: { getAllWindows: () => Array<{ isDestroyed: () => boolean; webContents: { send: (channel: string, ...args: unknown[]) => void } }> } | null = null;
+try { BrowserWindow = require('electron').BrowserWindow; } catch { BrowserWindow = null; }
+let session: { defaultSession: { fetch: (url: string, init?: RequestInit) => Promise<Response> } } | null = null;
+try { session = require('electron').session; } catch { session = null; }
 import { execSync, spawn, spawnSync } from 'child_process';
 import fs from 'fs';
 import path from 'path';
@@ -126,7 +133,7 @@ function buildSkillEnv(): Record<string, string | undefined> {
   // Normalize PATH key casing on Windows to avoid duplicate PATH/Path issues
   normalizePathKey(env);
 
-  if (app.isPackaged) {
+  if (app?.isPackaged) {
     // Ensure HOME is set (crucial for npm to find its config)
     if (!env.HOME) {
       env.HOME = app.getPath('home');
@@ -391,7 +398,7 @@ const resolveWindowsGitExecutable = (): string | null => {
     }
   }
 
-  const bundledRoots = app.isPackaged
+  const bundledRoots = app?.isPackaged
     ? [path.join(process.resourcesPath, 'mingit')]
     : [
       path.join(__dirname, '..', '..', 'resources', 'mingit'),
@@ -749,7 +756,8 @@ const downloadGithubArchive = async (
 
   for (const candidate of archiveUrlCandidates) {
     try {
-      const response = await session.defaultSession.fetch(candidate.url, {
+      const fetchFn = session?.defaultSession?.fetch ?? globalThis.fetch;
+      const response = await fetchFn(candidate.url, {
         method: 'GET',
         headers: candidate.headers,
       });
@@ -805,7 +813,8 @@ const isRemoteZipUrl = (source: string): boolean => {
 };
 
 const downloadZipUrl = async (zipUrl: string, tempRoot: string): Promise<string> => {
-  const response = await session.defaultSession.fetch(zipUrl, {
+  const fetchFn = session?.defaultSession?.fetch ?? globalThis.fetch;
+  const response = await fetchFn(zipUrl, {
     method: 'GET',
     headers: { 'User-Agent': 'LobsterAI Skill Downloader' },
   });
@@ -951,7 +960,7 @@ export class SkillManager {
   constructor(private getStore: () => SqliteStore) {}
 
   getSkillsRoot(): string {
-    return path.resolve(app.getPath('userData'), SKILLS_DIR_NAME);
+    return path.resolve(app?.getPath('userData') ?? path.join(os.homedir(), '.lobsterai'), SKILLS_DIR_NAME);
   }
 
   ensureSkillsRoot(): string {
@@ -963,7 +972,7 @@ export class SkillManager {
   }
 
   syncBundledSkillsToUserData(): void {
-    if (!app.isPackaged) {
+    if (!app?.isPackaged) {
       return;
     }
 
@@ -1221,7 +1230,7 @@ export class SkillManager {
         const stat = fs.statSync(localSource);
         if (stat.isFile()) {
           if (isZipFile(localSource)) {
-            const tempRoot = fs.mkdtempSync(path.join(app.getPath('temp'), 'lobsterai-skill-zip-'));
+            const tempRoot = fs.mkdtempSync(path.join(app?.getPath('temp') ?? os.tmpdir(), 'lobsterai-skill-zip-'));
             await extractZip(localSource, { dir: tempRoot });
             localSource = tempRoot;
             cleanupPath = tempRoot;
@@ -1232,7 +1241,7 @@ export class SkillManager {
           }
         }
       } else if (isRemoteZipUrl(trimmed)) {
-        const tempRoot = fs.mkdtempSync(path.join(app.getPath('temp'), 'lobsterai-skill-zip-'));
+        const tempRoot = fs.mkdtempSync(path.join(app?.getPath('temp') ?? os.tmpdir(), 'lobsterai-skill-zip-'));
         cleanupPath = tempRoot;
         localSource = await downloadZipUrl(trimmed, tempRoot);
       } else {
@@ -1240,7 +1249,7 @@ export class SkillManager {
         if (!normalized) {
           return { success: false, error: 'Invalid skill source. Use owner/repo, repo URL, or a GitHub tree/blob URL.' };
         }
-        const tempRoot = fs.mkdtempSync(path.join(app.getPath('temp'), 'lobsterai-skill-'));
+        const tempRoot = fs.mkdtempSync(path.join(app?.getPath('temp') ?? os.tmpdir(), 'lobsterai-skill-'));
         cleanupPath = tempRoot;
         const repoName = normalizeFolderName(normalized.repoNameHint || deriveRepoName(normalized.repoUrl));
         const clonePath = path.join(tempRoot, repoName);
@@ -1378,7 +1387,7 @@ export class SkillManager {
   }
 
   private notifySkillsChanged(): void {
-    BrowserWindow.getAllWindows().forEach(win => {
+    BrowserWindow?.getAllWindows().forEach(win => {
       if (!win.isDestroyed()) {
         win.webContents.send('skills:changed');
       }
@@ -1488,12 +1497,12 @@ export class SkillManager {
   }
 
   private getClaudeSkillsRoot(): string | null {
-    const homeDir = app.getPath('home');
+    const homeDir = app?.getPath('home') ?? os.homedir();
     return path.join(homeDir, CLAUDE_SKILLS_DIR_NAME, CLAUDE_SKILLS_SUBDIR);
   }
 
   private getBundledSkillsRoot(): string {
-    if (app.isPackaged) {
+    if (app?.isPackaged) {
       // In production, bundled SKILLs should be in Resources/SKILLs.
       const resourcesRoot = path.resolve(process.resourcesPath, SKILLS_DIR_NAME);
       if (fs.existsSync(resourcesRoot)) {
@@ -1549,7 +1558,7 @@ export class SkillManager {
   }
 
   private repairSkillFromBundled(skillId: string, skillPath: string): boolean {
-    if (!app.isPackaged) return false;
+    if (!app?.isPackaged) return false;
 
     const bundledRoot = this.getBundledSkillsRoot();
     if (!bundledRoot || !fs.existsSync(bundledRoot)) {

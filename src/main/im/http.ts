@@ -1,4 +1,7 @@
-import { app, session } from 'electron';
+// Conditional Electron imports for testability outside Electron
+let app: { isReady: () => boolean } | null = null;
+let session: { defaultSession: { fetch: typeof globalThis.fetch } } | null = null;
+try { const electron = require('electron'); app = electron.app; session = electron.session; } catch { app = null; session = null; }
 
 // Fallback for cases where Electron session is not ready yet.
 const nodeFetch = require('node-fetch');
@@ -12,9 +15,10 @@ function linkAbortSignal(source: AbortSignal, controller: AbortController): void
 }
 
 export async function fetchWithSystemProxy(url: string, options: RequestInit = {}): Promise<Response> {
-  if (app.isReady()) {
+  if (app?.isReady()) {
     try {
-      return await session.defaultSession.fetch(url, options);
+      const fetchFn = session?.defaultSession?.fetch ?? globalThis.fetch;
+      return await fetchFn(url, options);
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       console.warn(`[IM HTTP] session fetch failed, fallback to node-fetch: ${message}`);

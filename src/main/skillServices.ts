@@ -5,8 +5,12 @@
 import { execSync, spawn, spawnSync } from 'child_process';
 import path from 'path';
 import fs from 'fs';
-import { app } from 'electron';
+import os from 'os';
 import { cpRecursiveSync } from './fsCompat';
+
+// Conditional Electron import for testability outside Electron
+let app: { isPackaged: boolean; getPath: (name: string) => string; getAppPath: () => string } | null = null;
+try { app = require('electron').app; } catch { app = null; }
 import { getElectronNodeRuntimePath } from './libs/coworkUtil';
 import { appendPythonRuntimeToEnv } from './libs/pythonRuntime';
 
@@ -42,9 +46,9 @@ function buildSkillServiceEnv(): Record<string, string | undefined> {
   const env: Record<string, string | undefined> = { ...process.env };
   const electronNodeRuntimePath = getElectronNodeRuntimePath();
 
-  if (app.isPackaged) {
+  if (app?.isPackaged ?? false) {
     if (!env.HOME) {
-      env.HOME = app.getPath('home');
+      env.HOME = app?.getPath('home') ?? os.homedir();
     }
 
     const userPath = resolveUserShellPath();
@@ -189,11 +193,11 @@ export class SkillServiceManager {
   }
 
   private repairWebSearchRuntimeFromBundled(skillPath: string): void {
-    if (!app.isPackaged) return;
+    if (!(app?.isPackaged ?? false)) return;
 
     const candidates = [
       path.join(process.resourcesPath, 'SKILLs', 'web-search'),
-      path.join(app.getAppPath(), 'SKILLs', 'web-search'),
+      path.join(app?.getAppPath() ?? __dirname, 'SKILLs', 'web-search'),
     ];
 
     const bundledPath = candidates.find(candidate => candidate !== skillPath && fs.existsSync(candidate));
@@ -448,16 +452,16 @@ export class SkillServiceManager {
   private getWebSearchPath(): string | null {
     const candidates: string[] = [];
 
-    if (app.isPackaged) {
+    if (app?.isPackaged ?? false) {
       // Prefer userData for packaged apps so scripts run from a real filesystem path.
-      candidates.push(path.join(app.getPath('userData'), 'SKILLs', 'web-search'));
+      candidates.push(path.join(app?.getPath('userData') ?? path.join(os.homedir(), '.lobsterai'), 'SKILLs', 'web-search'));
       candidates.push(path.join(process.resourcesPath, 'SKILLs', 'web-search'));
-      candidates.push(path.join(app.getAppPath(), 'SKILLs', 'web-search'));
+      candidates.push(path.join(app?.getAppPath() ?? __dirname, 'SKILLs', 'web-search'));
     } else {
       // In development, __dirname is dist-electron/, so we need to go up one level to get to project root
       const projectRoot = path.resolve(__dirname, '..');
       candidates.push(path.join(projectRoot, 'SKILLs', 'web-search'));
-      candidates.push(path.join(app.getAppPath(), 'SKILLs', 'web-search'));
+      candidates.push(path.join(app?.getAppPath() ?? __dirname, 'SKILLs', 'web-search'));
     }
 
     return candidates.find(skillPath => fs.existsSync(skillPath)) ?? null;

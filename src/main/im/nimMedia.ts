@@ -9,8 +9,12 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as https from 'https';
 import * as http from 'http';
-import { app } from 'electron';
+import * as os from 'os';
 import type { IMMediaAttachment, IMMediaType } from './types';
+
+// Conditional Electron import for testability outside Electron
+let app: { getPath: (name: string) => string } | null = null;
+try { app = require('electron').app; } catch { app = null; }
 
 // ==================== 常量 ====================
 
@@ -26,7 +30,7 @@ const INBOUND_DIR = 'nim-inbound';
  * 获取 NIM 媒体文件存储目录
  */
 export function getNimMediaDir(): string {
-  const userDataPath = app.getPath('userData');
+  const userDataPath = app?.getPath('userData') ?? path.join(os.homedir(), '.lobsterai');
   const mediaDir = path.join(userDataPath, INBOUND_DIR);
 
   if (!fs.existsSync(mediaDir)) {

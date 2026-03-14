@@ -1,4 +1,5 @@
-import { app } from 'electron';
+let app: { isPackaged: boolean; getPath: (name: string) => string; getAppPath: () => string } | null = null;
+try { app = require('electron').app; } catch { app = null; }
 import { existsSync } from 'fs';
 import { join } from 'path';
 import { pathToFileURL } from 'url';
@@ -11,7 +12,7 @@ let claudeSdkPromise: Promise<ClaudeSdkModule> | null = null;
 const CLAUDE_SDK_PATH_PARTS = ['@anthropic-ai', 'claude-agent-sdk'];
 
 function getClaudeSdkPath(): string {
-  if (app.isPackaged) {
+  if (app?.isPackaged) {
     return join(
       process.resourcesPath,
       'app.asar.unpacked',
@@ -24,7 +25,7 @@ function getClaudeSdkPath(): string {
   // In development, try to find the SDK in the project root node_modules
   // app.getAppPath() might point to dist-electron or other build output directories
   // We need to look in the project root
-  const appPath = app.getAppPath();
+  const appPath = app?.getAppPath() ?? process.cwd();
   // If appPath ends with dist-electron, go up one level
   const rootDir = appPath.endsWith('dist-electron')
     ? join(appPath, '..')
@@ -55,7 +56,7 @@ export function loadClaudeSdk(): Promise<ClaudeSdkModule> {
       sdkPath,
       sdkUrl,
       sdkExists,
-      isPackaged: app.isPackaged,
+      isPackaged: app?.isPackaged ?? false,
       resourcesPath: process.resourcesPath,
     });
 
