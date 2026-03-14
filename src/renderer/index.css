@@ -232,7 +232,7 @@ select::-ms-expand {
   height: 2px;
   overflow: hidden;
   border-radius: 1px;
-  background: rgba(59,130,246,0.1);
+  background: rgba(0,218,144,0.1);
 }
 .streaming-bar::before {
   content: '';
@@ -242,14 +242,14 @@ select::-ms-expand {
   height: 100%;
   width: 40%;
   border-radius: 1px;
-  background: linear-gradient(90deg, rgba(59,130,246,0.3) 0%, rgba(59,130,246,0.8) 50%, rgba(59,130,246,0.3) 100%);
+  background: linear-gradient(90deg, rgba(0,218,144,0.3) 0%, rgba(0,218,144,0.8) 50%, rgba(0,218,144,0.3) 100%);
   animation: streaming-slide 1.5s ease-in-out infinite;
 }
 .dark .streaming-bar {
-  background: rgba(59,130,246,0.15);
+  background: rgba(0,218,144,0.15);
 }
 .dark .streaming-bar::before {
-  box-shadow: 0 0 6px rgba(59,130,246,0.4);
+  box-shadow: 0 0 6px rgba(0,218,144,0.4);
 }
 @keyframes streaming-slide {
   0% { left: -40%; }

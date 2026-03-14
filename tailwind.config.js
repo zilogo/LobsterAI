@@ -30,15 +30,15 @@ export default {
           darkBorderLight: '#1F232B',  // Subtle dark dividers
           darkText: '#E4E5E9',         // Dark primary text
           darkTextSecondary: '#8B8FA3', // Dark secondary text
-          // Accent (tech blue)
-          accent: '#3B82F6',           // Blue primary
-          accentHover: '#2563EB',      // Blue hover
-          accentLight: '#60A5FA',      // Light blue for badges
-          accentMuted: 'rgba(59,130,246,0.10)', // Very faint blue background
+          // Accent (brand green)
+          accent: '#00DA90',           // Green primary RGB(0,218,144)
+          accentHover: '#00B878',      // Green hover (darker)
+          accentLight: '#4DE8B0',      // Light green for badges
+          accentMuted: 'rgba(0,218,144,0.10)', // Very faint green background
         },
         primary: {
-          DEFAULT: '#3B82F6',
-          dark: '#2563EB'
+          DEFAULT: '#00DA90',
+          dark: '#00B878'
         },
         secondary: {
           DEFAULT: '#6B7280',
@@ -51,7 +51,7 @@ export default {
         elevated: '0 4px 12px rgba(0,0,0,0.1), 0 1px 3px rgba(0,0,0,0.04)',
         modal: '0 8px 30px rgba(0,0,0,0.16), 0 2px 8px rgba(0,0,0,0.08)',
         popover: '0 4px 20px rgba(0,0,0,0.12), 0 1px 4px rgba(0,0,0,0.05)',
-        'glow-accent': '0 0 20px rgba(59,130,246,0.15)',
+        'glow-accent': '0 0 20px rgba(0,218,144,0.15)',
       },
       keyframes: {
         'fade-in': {
@@ -90,9 +90,9 @@ export default {
           css: {
             color: '#1A1D23',
             a: {
-              color: '#3B82F6',
+              color: '#00DA90',
               '&:hover': {
-                color: '#2563EB',
+                color: '#00B878',
               },
             },
             code: {
@@ -116,7 +116,7 @@ export default {
               overflowX: 'auto',
             },
             blockquote: {
-              borderLeftColor: '#3B82F6',
+              borderLeftColor: '#00DA90',
               color: '#6B7280',
             },
             h1: {
@@ -140,9 +140,9 @@ export default {
           css: {
             color: '#E4E5E9',
             a: {
-              color: '#60A5FA',
+              color: '#4DE8B0',
               '&:hover': {
-                color: '#93BBFD',
+                color: '#7AEFC8',
               },
             },
             code: {
@@ -160,7 +160,7 @@ export default {
               overflowX: 'auto',
             },
             blockquote: {
-              borderLeftColor: '#3B82F6',
+              borderLeftColor: '#00DA90',
               color: '#8B8FA3',
             },
             h1: {
