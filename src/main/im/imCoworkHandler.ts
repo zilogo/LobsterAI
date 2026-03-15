@@ -20,6 +20,13 @@ interface MessageAccumulator {
   timeoutId?: NodeJS.Timeout;
 }
 
+interface QueuedIMRequest {
+  message: IMMessage;
+  replyFn?: (text: string) => Promise<void>;
+  resolve: (text: string) => void;
+  reject: (error: Error) => void;
+}
+
 interface PendingIMPermission {
   key: string;
   sessionId: string;
@@ -32,6 +39,7 @@ interface PendingIMPermission {
 
 const PERMISSION_CONFIRM_TIMEOUT_MS = 60_000;
 const ACCUMULATOR_TIMEOUT_MS = 5 * 60 * 1000; // 5 minutes
+const MAX_QUEUED_MESSAGES_PER_SESSION = 5;
 const IM_ALLOW_RESPONSE_RE = /^(允许|同意|yes|y)$/i;
 const IM_DENY_RESPONSE_RE = /^(拒绝|不同意|no|n)$/i;
 const IM_ALLOW_OPTION_LABEL = '允许本次操作';
@@ -56,6 +64,9 @@ export class IMCoworkHandler extends EventEmitter {
   private imSessionIds: Set<string> = new Set();
   private sessionConversationMap: Map<string, { conversationId: string; platform: IMPlatform }> = new Map();
   private pendingPermissionByConversation: Map<string, PendingIMPermission> = new Map();
+
+  // Queue for messages that arrive while session is busy processing
+  private pendingIMQueue: Map<string, QueuedIMRequest[]> = new Map();
 
   // Stream reply functions and sent message tracking
   private sessionReplyFns: Map<string, (text: string) => Promise<void>> = new Map();
@@ -123,6 +134,23 @@ export class IMCoworkHandler extends EventEmitter {
       conversationId: message.conversationId,
       platform: message.platform,
     });
+
+    // If session is currently processing an IM request (accumulator exists), queue this message
+    if (this.messageAccumulators.has(coworkSessionId)) {
+      const queue = this.pendingIMQueue.get(coworkSessionId) || [];
+      if (queue.length >= MAX_QUEUED_MESSAGES_PER_SESSION) {
+        return Promise.resolve('当前消息较多，请稍后再发送。');
+      }
+      return new Promise<string>((resolve, reject) => {
+        queue.push({ message, replyFn, resolve, reject });
+        this.pendingIMQueue.set(coworkSessionId, queue);
+        console.log(`[IMCoworkHandler] 消息已排队等待处理`, JSON.stringify({
+          sessionId: coworkSessionId,
+          platform: message.platform,
+          queueLength: queue.length,
+        }));
+      });
+    }
 
     // Store replyFn for streaming individual messages
     if (replyFn) {
@@ -205,6 +233,7 @@ export class IMCoworkHandler extends EventEmitter {
         this.imSessionIds.delete(stale.coworkSessionId);
         this.sessionConversationMap.delete(stale.coworkSessionId);
         this.clearPendingPermissionsBySessionId(stale.coworkSessionId);
+        this.rejectQueuedMessages(stale.coworkSessionId, new Error('Session reset'));
         this.coworkRunner.stopSession(stale.coworkSessionId);
       }
     }
@@ -221,6 +250,7 @@ export class IMCoworkHandler extends EventEmitter {
         this.imSessionIds.delete(existing.coworkSessionId);
         this.sessionConversationMap.delete(existing.coworkSessionId);
         this.clearPendingPermissionsBySessionId(existing.coworkSessionId);
+        this.rejectQueuedMessages(existing.coworkSessionId, new Error('Stale session'));
         this.coworkRunner.stopSession(existing.coworkSessionId);
       } else {
         this.imStore.updateSessionLastActive(imConversationId, platform);
@@ -415,6 +445,8 @@ export class IMCoworkHandler extends EventEmitter {
     return new Promise((resolve, reject) => {
       const existingAccumulator = this.messageAccumulators.get(sessionId);
       if (existingAccumulator) {
+        // Safety net: should not happen with queue in place
+        console.warn(`[IMCoworkHandler] Unexpected: replacing accumulator for session ${sessionId} (should have been queued)`);
         if (existingAccumulator.timeoutId) {
           clearTimeout(existingAccumulator.timeoutId);
         }
@@ -663,6 +695,9 @@ export class IMCoworkHandler extends EventEmitter {
       this.cleanupAccumulator(sessionId);
       accumulator.resolve(replyText);
     }
+
+    // Process next queued message if any
+    this.processNextQueuedMessage(sessionId);
   }
 
   /**
@@ -679,6 +714,9 @@ export class IMCoworkHandler extends EventEmitter {
       this.cleanupAccumulator(sessionId);
       accumulator.reject(new Error(error));
     }
+
+    // Process next queued message despite error (give it a chance)
+    this.processNextQueuedMessage(sessionId);
   }
 
   /**
@@ -690,6 +728,43 @@ export class IMCoworkHandler extends EventEmitter {
       clearTimeout(accumulator.timeoutId);
     }
     this.messageAccumulators.delete(sessionId);
+  }
+
+  /**
+   * Process the next queued IM message for a session
+   */
+  private processNextQueuedMessage(sessionId: string): void {
+    const queue = this.pendingIMQueue.get(sessionId);
+    if (!queue || queue.length === 0) {
+      this.pendingIMQueue.delete(sessionId);
+      return;
+    }
+
+    const next = queue.shift()!;
+    if (queue.length === 0) {
+      this.pendingIMQueue.delete(sessionId);
+    }
+
+    console.log(`[IMCoworkHandler] 处理排队消息`, JSON.stringify({
+      sessionId,
+      platform: next.message.platform,
+      remainingQueue: queue.length,
+    }));
+
+    this.processMessageInternal(next.message, false, next.replyFn)
+      .then(next.resolve)
+      .catch(next.reject);
+  }
+
+  /**
+   * Reject all queued messages for a session
+   */
+  private rejectQueuedMessages(sessionId: string, error: Error): void {
+    const queue = this.pendingIMQueue.get(sessionId);
+    if (queue) {
+      queue.forEach((item) => item.reject(error));
+      this.pendingIMQueue.delete(sessionId);
+    }
   }
 
   /**
@@ -796,6 +871,11 @@ export class IMCoworkHandler extends EventEmitter {
       accumulator.reject(new Error('Handler destroyed'));
     });
     this.messageAccumulators.clear();
+    // Reject all queued messages
+    this.pendingIMQueue.forEach((queue) => {
+      queue.forEach((item) => item.reject(new Error('Handler destroyed')));
+    });
+    this.pendingIMQueue.clear();
     this.imSessionIds.clear();
     this.sessionConversationMap.clear();
     this.sessionReplyFns.clear();

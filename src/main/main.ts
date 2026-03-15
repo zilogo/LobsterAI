@@ -87,14 +87,33 @@ const inferAttachmentExtension = (fileName: string, mimeType?: string): string =
   return '';
 };
 
+/** 与 server/routes/files.ts resolveInlineAttachmentDir 保持一致 */
 const resolveInlineAttachmentDir = (cwd?: string): string => {
-  const trimmed = typeof cwd === 'string' ? cwd.trim() : '';
-  if (trimmed) {
-    const resolved = path.resolve(trimmed);
-    if (fs.existsSync(resolved) && fs.statSync(resolved).isDirectory()) {
-      return path.join(resolved, '.cowork-temp', 'attachments', 'manual');
+  const buildDir = (base: string) => path.join(base, '.cowork-temp', 'attachments', 'manual');
+
+  try {
+    const configuredCwd = getCoworkStore().getConfig().workingDirectory;
+    const resolvedConfigured = configuredCwd ? path.resolve(configuredCwd) : '';
+
+    // 优先使用传入的 cwd（须为 workingDirectory 或其子路径）
+    const trimmed = typeof cwd === 'string' ? cwd.trim() : '';
+    if (trimmed) {
+      const resolved = path.resolve(trimmed);
+      if (resolvedConfigured && resolved.startsWith(resolvedConfigured)) {
+        if (fs.existsSync(resolved) && fs.statSync(resolved).isDirectory()) {
+          return buildDir(resolved);
+        }
+      }
     }
+
+    // fallback: 直接使用已配置的 workingDirectory
+    if (resolvedConfigured) {
+      return buildDir(resolvedConfigured);
+    }
+  } catch {
+    // coworkStore 未初始化时 fallback
   }
+
   return path.join(app.getPath('temp'), APP_ID, 'attachments');
 };
 

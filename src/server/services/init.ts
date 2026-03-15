@@ -222,8 +222,12 @@ export async function initializeAllServices(): Promise<void> {
   console.log('[Server] McpStore initialized');
 
   try {
-    getIMGatewayManager();
+    const imManager = getIMGatewayManager();
     console.log('[Server] IMGatewayManager initialized');
+    // Auto-start all enabled IM gateways (same as Electron mode)
+    imManager.startAllEnabled().catch((error) => {
+      console.warn('[Server] IM gateways auto-start failed (non-fatal):', error);
+    });
   } catch (error) {
     console.warn('[Server] IMGatewayManager initialization failed (non-fatal):', error);
   }
