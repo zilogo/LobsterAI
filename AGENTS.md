@@ -279,3 +279,62 @@ cloudflared tunnel --url http://localhost:3001
 - 免费 Tunnel 单请求上限 100MB，但因文件上传使用 base64 编码（膨胀 ~33%），Express JSON body 限制 50MB，实际可上传文件约 **37MB**
 - WebSocket 通过 Tunnel 正常工作（Cloudflare 支持 WebSocket 透传）
 - 如需固定域名，需注册 Cloudflare 账号并创建 Named Tunnel
+
+### Production Server Deployment
+
+正式环境部署在内网服务器，Web 模式运行。
+
+**服务器信息：**
+
+| 项目 | 详情 |
+|---|---|
+| IP | 172.16.13.76 |
+| OS | Ubuntu 22.04.5 LTS (94GB RAM, 1TB Disk) |
+| 用户 | laiye / Laiye123# |
+| Node.js | v24.14.0 (via nvm) |
+| 代码路径 | /home/laiye/Projects/LobsterAI |
+| 工作目录 | /home/laiye/assistant/project |
+| 数据目录 | /home/laiye/.assistant/ (SQLite 数据库等) |
+| 访问地址 | http://172.16.13.76:3001 |
+| 进程管理 | pm2 (进程名: lobsterai) |
+| 开机自启 | systemd (pm2-laiye.service) |
+
+**部署注意事项：**
+
+- `node_modules/electron` 已删除（服务器仅需 Web 模式，electron 包会导致启动崩溃）
+- 安装依赖使用 `npm install --ignore-scripts`（跳过 postinstall 中的 electron-builder），然后手动 `npx patch-package`
+- `src/main/libs/systemProxy.ts` 已修改为条件导入 electron，避免 Web 模式启动报错
+- 编译 `npm run compile:server` 会有 electron 相关类型错误（预期行为，不影响 JS 输出和运行）
+
+**同步与更新流程：**
+
+```bash
+# 1. 本地修改代码并验证编译通过
+npx tsc --project tsconfig.server.json --noEmit
+
+# 2. 同步代码到服务器（排除构建产物）
+sshpass -p 'Laiye123#' rsync -avz \
+  --exclude 'node_modules' --exclude 'dist' --exclude 'dist-electron' \
+  --exclude 'dist-server' --exclude 'release' --exclude '.git' --exclude '*.sqlite' \
+  -e "ssh -o StrictHostKeyChecking=no" \
+  /Users/leizhao/Projects/claws/LobsterAI/ \
+  laiye@172.16.13.76:/home/laiye/Projects/LobsterAI/
+
+# 3. 远程编译并重启
+sshpass -p 'Laiye123#' ssh -o StrictHostKeyChecking=no laiye@172.16.13.76 \
+  'export NVM_DIR="$HOME/.nvm" && . "$NVM_DIR/nvm.sh" && \
+   cd /home/laiye/Projects/LobsterAI && \
+   npm run web:build && \
+   pm2 restart lobsterai'
+```
+
+**常用运维命令（SSH 到服务器后执行）：**
+
+```bash
+pm2 status                  # 查看服务状态
+pm2 logs lobsterai          # 实时查看日志
+pm2 logs lobsterai --lines 50 --nostream  # 查看最近 50 行日志
+pm2 restart lobsterai       # 重启服务
+pm2 stop lobsterai          # 停止服务
+pm2 save                    # 保存进程列表（开机自启用）
+```
