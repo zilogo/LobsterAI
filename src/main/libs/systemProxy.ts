@@ -1,4 +1,6 @@
-import { app, session } from 'electron';
+let app: { isReady: () => boolean } | null = null;
+let session: { defaultSession: { resolveProxy: (url: string) => Promise<string> } } | null = null;
+try { const electron = require('electron'); app = electron.app; session = electron.session; } catch { app = null; session = null; }
 
 const PROXY_ENV_KEYS = [
   'http_proxy',
@@ -88,7 +90,7 @@ export function applySystemProxyEnv(proxyUrl: string | null): void {
 }
 
 export async function resolveSystemProxyUrl(targetUrl: string): Promise<string | null> {
-  if (!app.isReady()) {
+  if (!app || !app.isReady() || !session) {
     return null;
   }
 
