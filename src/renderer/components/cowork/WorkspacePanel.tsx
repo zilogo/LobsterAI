@@ -277,11 +277,11 @@ const WorkspacePanel: React.FC<WorkspacePanelProps> = ({ isOpen, onClose, workin
   if (!workingDirectory) {
     return (
       <aside className="w-72 shrink-0 border-l dark:border-claude-darkBorder border-claude-border dark:bg-claude-darkSurface/30 bg-claude-surface/30 flex flex-col">
-        <div className="flex items-center justify-between px-3 py-2 border-b dark:border-claude-darkBorder border-claude-border">
+        <div className="flex h-12 items-center justify-between px-3 border-b dark:border-claude-darkBorder border-claude-border">
           <span className="text-sm font-medium dark:text-claude-darkText text-claude-text">
             {i18nService.t('workspaceFiles')}
           </span>
-          <button type="button" onClick={onClose} className="p-1 rounded hover:bg-claude-surfaceHover dark:hover:bg-claude-darkSurfaceHover">
+          <button type="button" onClick={onClose} className="p-1.5 rounded-md hover:bg-claude-surfaceHover dark:hover:bg-claude-darkSurfaceHover transition-colors">
             <XMarkIcon className="h-4 w-4 dark:text-claude-darkTextSecondary text-claude-textSecondary" />
           </button>
         </div>
@@ -296,42 +296,41 @@ const WorkspacePanel: React.FC<WorkspacePanelProps> = ({ isOpen, onClose, workin
 
   return (
     <aside className="w-72 shrink-0 border-l dark:border-claude-darkBorder border-claude-border dark:bg-claude-darkSurface/30 bg-claude-surface/30 flex flex-col h-full overflow-hidden">
-      {/* Header */}
-      <div className="flex items-center justify-between px-3 py-2 border-b dark:border-claude-darkBorder border-claude-border shrink-0">
+      {/* Header + Toolbar (h-12 与左侧 header 对齐) */}
+      <div className="flex h-12 items-center justify-between px-3 border-b dark:border-claude-darkBorder border-claude-border shrink-0">
         <span className="text-sm font-medium dark:text-claude-darkText text-claude-text">
           {i18nService.t('workspaceFiles')}
         </span>
-        <button type="button" onClick={onClose} className="p-1 rounded hover:bg-claude-surfaceHover dark:hover:bg-claude-darkSurfaceHover">
-          <XMarkIcon className="h-4 w-4 dark:text-claude-darkTextSecondary text-claude-textSecondary" />
-        </button>
-      </div>
-
-      {/* Toolbar */}
-      <div className="flex items-center gap-1 px-3 py-1.5 border-b dark:border-claude-darkBorder border-claude-border shrink-0">
-        <button
-          type="button"
-          onClick={handleUpload}
-          className="p-1.5 rounded-md hover:bg-claude-surfaceHover dark:hover:bg-claude-darkSurfaceHover transition-colors"
-          title={i18nService.t('workspaceUpload')}
-        >
-          <ArrowUpTrayIcon className="h-4 w-4 dark:text-claude-darkTextSecondary text-claude-textSecondary" />
-        </button>
-        <button
-          type="button"
-          onClick={() => { setIsCreatingFolder(true); setNewFolderName(''); }}
-          className="p-1.5 rounded-md hover:bg-claude-surfaceHover dark:hover:bg-claude-darkSurfaceHover transition-colors"
-          title={i18nService.t('workspaceNewFolder')}
-        >
-          <FolderPlusIcon className="h-4 w-4 dark:text-claude-darkTextSecondary text-claude-textSecondary" />
-        </button>
-        <button
-          type="button"
-          onClick={handleRefresh}
-          className="p-1.5 rounded-md hover:bg-claude-surfaceHover dark:hover:bg-claude-darkSurfaceHover transition-colors"
-          title={i18nService.t('workspaceRefresh')}
-        >
-          <ArrowPathIcon className="h-4 w-4 dark:text-claude-darkTextSecondary text-claude-textSecondary" />
-        </button>
+        <div className="flex items-center gap-0.5">
+          <button
+            type="button"
+            onClick={handleUpload}
+            className="p-1.5 rounded-md hover:bg-claude-surfaceHover dark:hover:bg-claude-darkSurfaceHover transition-colors"
+            title={i18nService.t('workspaceUpload')}
+          >
+            <ArrowUpTrayIcon className="h-4 w-4 dark:text-claude-darkTextSecondary text-claude-textSecondary" />
+          </button>
+          <button
+            type="button"
+            onClick={() => { setIsCreatingFolder(true); setNewFolderName(''); }}
+            className="p-1.5 rounded-md hover:bg-claude-surfaceHover dark:hover:bg-claude-darkSurfaceHover transition-colors"
+            title={i18nService.t('workspaceNewFolder')}
+          >
+            <FolderPlusIcon className="h-4 w-4 dark:text-claude-darkTextSecondary text-claude-textSecondary" />
+          </button>
+          <button
+            type="button"
+            onClick={handleRefresh}
+            className="p-1.5 rounded-md hover:bg-claude-surfaceHover dark:hover:bg-claude-darkSurfaceHover transition-colors"
+            title={i18nService.t('workspaceRefresh')}
+          >
+            <ArrowPathIcon className="h-4 w-4 dark:text-claude-darkTextSecondary text-claude-textSecondary" />
+          </button>
+          <div className="w-px h-4 dark:bg-claude-darkBorder bg-claude-border mx-0.5" />
+          <button type="button" onClick={onClose} className="p-1.5 rounded-md hover:bg-claude-surfaceHover dark:hover:bg-claude-darkSurfaceHover transition-colors">
+            <XMarkIcon className="h-4 w-4 dark:text-claude-darkTextSecondary text-claude-textSecondary" />
+          </button>
+        </div>
       </div>
 
       {/* Breadcrumb */}

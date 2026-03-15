@@ -1099,7 +1099,7 @@ const AssistantTurnBlock: React.FC<{
     <div className="px-4 py-2">
       <div className="max-w-3xl mx-auto">
         <div className="flex items-start gap-3">
-          <div className="flex-1 min-w-0 px-4 py-3 space-y-3">
+          <div className="flex-1 min-w-0 px-4 py-3 space-y-3 border border-claude-accent/30 rounded-lg">
             {visibleAssistantItems.map((item, index) => {
               if (item.type === 'assistant') {
                 if (item.message.metadata?.isThinking) {
