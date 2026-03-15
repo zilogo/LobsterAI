@@ -11,6 +11,7 @@ import { v4 as uuidv4 } from 'uuid';
 import type { PermissionResult } from '@anthropic-ai/claude-agent-sdk';
 import type { CoworkStore, CoworkMessage, CoworkExecutionMode } from '../coworkStore';
 import { getClaudeCodePath, getCurrentApiConfig } from './claudeSettings';
+import { APP_ID, USER_DATA_DIR_NAME } from '../appConstants';
 import { loadClaudeSdk } from './claudeSdk';
 import { getElectronNodeRuntimePath, getEnhancedEnv, getEnhancedEnvWithTmpdir, getSkillsRoot } from './coworkUtil';
 import { coworkLog, getCoworkLogPath } from './coworkLogger';
@@ -102,7 +103,7 @@ const TOOL_INPUT_PREVIEW_MAX_DEPTH = 5;
 const TOOL_INPUT_PREVIEW_MAX_KEYS = 60;
 const TOOL_INPUT_PREVIEW_MAX_ITEMS = 30;
 const SKILLS_MARKER = '/skills/';
-const TASK_WORKSPACE_CONTAINER_DIR = '.lobsterai-tasks';
+const TASK_WORKSPACE_CONTAINER_DIR = `.${APP_ID}-tasks`;
 const PERMISSION_RESPONSE_TIMEOUT_MS = 60_000;
 const DELETE_TOOL_NAMES = new Set(['delete', 'remove', 'unlink', 'rmdir']);
 const SAFETY_APPROVAL_ALLOW_OPTION = '允许本次操作';
@@ -185,7 +186,7 @@ function ensureWindowsChildProcessHideInitScript(): string | null {
   }
 
   try {
-    const initDir = path.join(app?.getPath('userData') ?? path.join(os.homedir(), '.lobsterai'), 'cowork', 'bin');
+    const initDir = path.join(app?.getPath('userData') ?? path.join(os.homedir(), USER_DATA_DIR_NAME), 'cowork', 'bin');
     fs.mkdirSync(initDir, { recursive: true });
     const initScriptPath = path.join(initDir, WINDOWS_HIDE_INIT_SCRIPT_NAME);
 

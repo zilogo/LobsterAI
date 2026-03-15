@@ -5,6 +5,7 @@ import { spawnSync } from 'child_process';
 import fs from 'fs';
 import path from 'path';
 import { cpRecursiveSync } from '../fsCompat';
+import { USER_DATA_DIR_NAME } from '../appConstants';
 
 const PYTHON_RUNTIME_DIR_NAME = 'python-win';
 const PYTHON_RUNTIME_STATE_FILE = 'runtime.json';
@@ -221,7 +222,7 @@ export function getBundledPythonRoot(): string | null {
 }
 
 export function getUserPythonRoot(): string {
-  return path.join(app?.getPath('userData') ?? path.join(os.homedir(), '.lobsterai'), 'runtimes', PYTHON_RUNTIME_DIR_NAME);
+  return path.join(app?.getPath('userData') ?? path.join(os.homedir(), USER_DATA_DIR_NAME), 'runtimes', PYTHON_RUNTIME_DIR_NAME);
 }
 
 export function appendPythonRuntimeToEnv(env: Record<string, string | undefined>): Record<string, string | undefined> {

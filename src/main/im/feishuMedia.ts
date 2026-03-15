@@ -7,6 +7,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 import type { IMMediaType } from './types';
+import { USER_DATA_DIR_NAME } from '../appConstants';
 
 // Conditional Electron import for testability outside Electron
 let app: { getPath: (name: string) => string } | null = null;
@@ -228,7 +229,7 @@ const INBOUND_DIR = 'feishu-inbound';
  * 获取飞书媒体存储目录
  */
 export function getFeishuMediaDir(): string {
-  const userDataPath = app?.getPath('userData') ?? path.join(os.homedir(), '.lobsterai');
+  const userDataPath = app?.getPath('userData') ?? path.join(os.homedir(), USER_DATA_DIR_NAME);
   const mediaDir = path.join(userDataPath, INBOUND_DIR);
 
   if (!fs.existsSync(mediaDir)) {

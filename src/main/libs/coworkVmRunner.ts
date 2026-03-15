@@ -10,6 +10,7 @@ import { StringDecoder } from 'string_decoder';
 import { v4 as uuidv4 } from 'uuid';
 import type { SandboxRuntimeInfo } from './coworkSandboxRuntime';
 import { coworkLog } from './coworkLogger';
+import { USER_DATA_DIR_NAME } from '../appConstants';
 
 export type CoworkSandboxPaths = {
   baseDir: string;
@@ -39,7 +40,7 @@ export type SandboxExtraMount = {
 };
 
 export function ensureCoworkSandboxDirs(sessionId: string): CoworkSandboxPaths {
-  const baseDir = path.join(app?.getPath('userData') ?? path.join(os.homedir(), '.lobsterai'), 'cowork', 'sandbox');
+  const baseDir = path.join(app?.getPath('userData') ?? path.join(os.homedir(), USER_DATA_DIR_NAME), 'cowork', 'sandbox');
   const ipcDir = path.join(baseDir, 'ipc', sessionId);
   const requestsDir = path.join(ipcDir, 'requests');
   const responsesDir = path.join(ipcDir, 'responses');

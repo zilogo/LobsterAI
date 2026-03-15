@@ -15,6 +15,19 @@ import { SqliteStore } from './sqliteStore';
 import { cpRecursiveSync } from './fsCompat';
 import { getElectronNodeRuntimePath } from './libs/coworkUtil';
 import { appendPythonRuntimeToEnv } from './libs/pythonRuntime';
+import { getProxyUrl, shouldProxy } from './libs/proxyConfig';
+import { USER_DATA_DIR_NAME } from './appConstants';
+
+/**
+ * Proxy-aware fetch that works in both Electron and Node.js environments.
+ * - Electron: uses session.defaultSession.fetch (inherits system/session proxy)
+ * - Node.js (Web server): uses globalThis.fetch — selective proxy is handled at
+ *   process level via global dispatcher (set in src/server/index.ts)
+ */
+function proxyAwareFetch(url: string, init?: RequestInit): Promise<Response> {
+  const fetchFn = session?.defaultSession?.fetch ?? globalThis.fetch;
+  return fetchFn(url, init);
+}
 
 /**
  * Resolve the user's login shell PATH on macOS/Linux.
@@ -756,8 +769,7 @@ const downloadGithubArchive = async (
 
   for (const candidate of archiveUrlCandidates) {
     try {
-      const fetchFn = session?.defaultSession?.fetch ?? globalThis.fetch;
-      const response = await fetchFn(candidate.url, {
+      const response = await proxyAwareFetch(candidate.url, {
         method: 'GET',
         headers: candidate.headers,
       });
@@ -813,8 +825,7 @@ const isRemoteZipUrl = (source: string): boolean => {
 };
 
 const downloadZipUrl = async (zipUrl: string, tempRoot: string): Promise<string> => {
-  const fetchFn = session?.defaultSession?.fetch ?? globalThis.fetch;
-  const response = await fetchFn(zipUrl, {
+  const response = await proxyAwareFetch(zipUrl, {
     method: 'GET',
     headers: { 'User-Agent': 'LobsterAI Skill Downloader' },
   });
@@ -960,7 +971,7 @@ export class SkillManager {
   constructor(private getStore: () => SqliteStore) {}
 
   getSkillsRoot(): string {
-    return path.resolve(app?.getPath('userData') ?? path.join(os.homedir(), '.lobsterai'), SKILLS_DIR_NAME);
+    return path.resolve(app?.getPath('userData') ?? path.join(os.homedir(), USER_DATA_DIR_NAME), SKILLS_DIR_NAME);
   }
 
   ensureSkillsRoot(): string {
@@ -1260,9 +1271,18 @@ export class SkillManager {
         cloneArgs.push(normalized.repoUrl, clonePath);
         const gitRuntime = resolveGitCommand();
         const githubSource = parseGithubRepoSource(normalized.repoUrl);
+        // Inject proxy env for git child process when the repo URL matches proxied domains
+        const gitEnv = { ...gitRuntime.env ?? process.env };
+        if (shouldProxy(normalized.repoUrl)) {
+          const proxy = getProxyUrl();
+          if (proxy) {
+            gitEnv.https_proxy = proxy;
+            gitEnv.http_proxy = proxy;
+          }
+        }
         let downloadedSourceRoot = clonePath;
         try {
-          await runCommand(gitRuntime.command, cloneArgs, { env: gitRuntime.env });
+          await runCommand(gitRuntime.command, cloneArgs, { env: gitEnv });
         } catch (error) {
           const errno = (error as NodeJS.ErrnoException | null)?.code;
           if (githubSource) {
@@ -1513,10 +1533,20 @@ export class SkillManager {
       return path.resolve(app.getAppPath(), SKILLS_DIR_NAME);
     }
 
-    // In development, use the project root (parent of dist-electron).
-    // __dirname is dist-electron/, so we need to go up one level to get to project root
-    const projectRoot = path.resolve(__dirname, '..');
-    return path.resolve(projectRoot, SKILLS_DIR_NAME);
+    // In development, find project root from __dirname.
+    // Electron dev: __dirname = dist-electron/        → parent = project root
+    // Web server:   __dirname = dist-server/src/main/ → 3 levels up = project root
+    const candidates = [
+      path.resolve(__dirname, '..'),
+      path.resolve(__dirname, '../../..'),
+    ];
+    for (const candidate of candidates) {
+      const skillsDir = path.resolve(candidate, SKILLS_DIR_NAME);
+      if (fs.existsSync(skillsDir)) {
+        return skillsDir;
+      }
+    }
+    return path.resolve(__dirname, '..', SKILLS_DIR_NAME);
   }
 
   getSkillConfig(skillId: string): { success: boolean; config?: Record<string, string>; error?: string } {

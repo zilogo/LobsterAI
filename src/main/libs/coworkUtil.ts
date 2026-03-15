@@ -10,6 +10,7 @@ import type { OpenAICompatProxyTarget } from './coworkOpenAICompatProxy';
 import { getInternalApiBaseURL } from './coworkOpenAICompatProxy';
 import { coworkLog } from './coworkLogger';
 import { appendPythonRuntimeToEnv } from './pythonRuntime';
+import { USER_DATA_DIR_NAME } from '../appConstants';
 import { isSystemProxyEnabled, resolveSystemProxyUrl } from './systemProxy';
 
 function appendEnvPath(current: string | undefined, additions: string[]): string | undefined {
@@ -445,7 +446,7 @@ function getWindowsGitToolDirs(bashPath: string): string[] {
 
 function ensureElectronNodeShim(electronPath: string, npmBinDir?: string): string | null {
   try {
-    const shimDir = join(app?.getPath('userData') ?? join(os.homedir(), '.lobsterai'), 'cowork', 'bin');
+    const shimDir = join(app?.getPath('userData') ?? join(os.homedir(), USER_DATA_DIR_NAME), 'cowork', 'bin');
     mkdirSync(shimDir, { recursive: true });
     coworkLog('INFO', 'resolveNodeShim', `Shim directory: ${shimDir}, electronPath: ${electronPath}, npmBinDir: ${npmBinDir || '(none)'}`);
 
@@ -926,7 +927,7 @@ function ensureWindowsOriginalPath(env: Record<string, string | undefined>): voi
  */
 function ensureWindowsBashUtf8InitScript(): string | null {
   try {
-    const initDir = join(app?.getPath('userData') ?? join(os.homedir(), '.lobsterai'), 'cowork', 'bin');
+    const initDir = join(app?.getPath('userData') ?? join(os.homedir(), USER_DATA_DIR_NAME), 'cowork', 'bin');
     mkdirSync(initDir, { recursive: true });
 
     const initScript = join(initDir, 'bash_utf8_init.sh');

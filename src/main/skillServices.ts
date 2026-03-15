@@ -12,6 +12,7 @@ import { cpRecursiveSync } from './fsCompat';
 let app: { isPackaged: boolean; getPath: (name: string) => string; getAppPath: () => string } | null = null;
 try { app = require('electron').app; } catch { app = null; }
 import { getElectronNodeRuntimePath } from './libs/coworkUtil';
+import { USER_DATA_DIR_NAME } from './appConstants';
 import { appendPythonRuntimeToEnv } from './libs/pythonRuntime';
 
 /**
@@ -454,13 +455,14 @@ export class SkillServiceManager {
 
     if (app?.isPackaged ?? false) {
       // Prefer userData for packaged apps so scripts run from a real filesystem path.
-      candidates.push(path.join(app?.getPath('userData') ?? path.join(os.homedir(), '.lobsterai'), 'SKILLs', 'web-search'));
+      candidates.push(path.join(app?.getPath('userData') ?? path.join(os.homedir(), USER_DATA_DIR_NAME), 'SKILLs', 'web-search'));
       candidates.push(path.join(process.resourcesPath, 'SKILLs', 'web-search'));
       candidates.push(path.join(app?.getAppPath() ?? __dirname, 'SKILLs', 'web-search'));
     } else {
-      // In development, __dirname is dist-electron/, so we need to go up one level to get to project root
-      const projectRoot = path.resolve(__dirname, '..');
-      candidates.push(path.join(projectRoot, 'SKILLs', 'web-search'));
+      // Electron dev: __dirname = dist-electron/ → parent = project root
+      // Web server:   __dirname = dist-server/src/main/ → 3 levels up = project root
+      candidates.push(path.join(path.resolve(__dirname, '..'), 'SKILLs', 'web-search'));
+      candidates.push(path.join(path.resolve(__dirname, '../../..'), 'SKILLs', 'web-search'));
       candidates.push(path.join(app?.getAppPath() ?? __dirname, 'SKILLs', 'web-search'));
     }
 

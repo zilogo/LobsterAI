@@ -11,6 +11,7 @@ import { pipeline } from 'stream/promises';
 import { createGunzip } from 'zlib';
 import { spawnSync } from 'child_process';
 import { coworkLog } from './coworkLogger';
+import { USER_DATA_DIR_NAME } from '../appConstants';
 
 export type CoworkSandboxStatus = {
   supported: boolean;
@@ -124,7 +125,7 @@ function getRuntimeBinaryName(): string {
 
 function getSandboxPaths() {
   const os = require('os');
-  const baseDir = path.join(app?.getPath('userData') ?? path.join(os.homedir(), '.lobsterai'), 'cowork', 'sandbox');
+  const baseDir = path.join(app?.getPath('userData') ?? path.join(os.homedir(), USER_DATA_DIR_NAME), 'cowork', 'sandbox');
   const runtimeDir = path.join(baseDir, 'runtime', `${SANDBOX_RUNTIME_VERSION}`);
   const imageDir = path.join(baseDir, 'images', `${SANDBOX_IMAGE_VERSION}`);
   const runtimeBinary = path.join(runtimeDir, getRuntimeBinaryName());

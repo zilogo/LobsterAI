@@ -11,6 +11,7 @@ import { fetchWithSystemProxy } from './http';
 let app: { getPath: (name: string) => string } | null = null;
 try { app = require('electron').app; } catch { app = null; }
 import type { IMMediaType } from './types';
+import { USER_DATA_DIR_NAME } from '../appConstants';
 
 const MAX_FILE_SIZE = 25 * 1024 * 1024; // 25MB
 const INBOUND_DIR = 'qq-inbound';
@@ -19,7 +20,7 @@ const INBOUND_DIR = 'qq-inbound';
  * 获取 QQ 媒体存储目录
  */
 export function getQQMediaDir(): string {
-  const userDataPath = app?.getPath('userData') ?? path.join(os.homedir(), '.lobsterai');
+  const userDataPath = app?.getPath('userData') ?? path.join(os.homedir(), USER_DATA_DIR_NAME);
   const mediaDir = path.join(userDataPath, INBOUND_DIR);
 
   if (!fs.existsSync(mediaDir)) {

@@ -13,6 +13,7 @@ import * as fs from 'fs';
 // Conditional Electron import for testability outside Electron
 let app: { getPath: (name: string) => string } | null = null;
 try { app = require('electron').app; } catch { app = null; }
+import { USER_DATA_DIR_NAME } from '../appConstants';
 const NIM = require('nim-web-sdk-ng/dist/nodejs/nim.js').default;
 import type { V2NIM } from 'nim-web-sdk-ng/dist/nodejs/nim';
 import {
@@ -120,9 +121,9 @@ function parseConversationId(conversationId: string): { sessionType: 'p2p' | 'te
 function getSdkDataPath(account: string): string {
   let baseDir: string;
   try {
-    baseDir = app?.getPath('userData') ?? path.join(os.homedir(), '.lobsterai');
+    baseDir = app?.getPath('userData') ?? path.join(os.homedir(), USER_DATA_DIR_NAME);
   } catch {
-    baseDir = path.join(os.homedir(), '.lobsterai');
+    baseDir = path.join(os.homedir(), USER_DATA_DIR_NAME);
   }
   const dataDir = path.join(baseDir, SDK_DATA_DIR, account);
   if (!fs.existsSync(dataDir)) {
@@ -206,7 +207,7 @@ export class XiaomifengGateway extends EventEmitter {
    */
   private initStatePersistence(): void {
     try {
-      const userDataPath = app?.getPath('userData') ?? path.join(os.homedir(), '.lobsterai');
+      const userDataPath = app?.getPath('userData') ?? path.join(os.homedir(), USER_DATA_DIR_NAME);
       this.stateFilePath = path.join(userDataPath, STATE_FILE_NAME);
       this.loadPersistedState();
     } catch {

@@ -11,6 +11,7 @@ import type { Context } from 'grammy';
 let app: { getPath: (name: string) => string } | null = null;
 try { app = require('electron').app; } catch { app = null; }
 import type { IMMediaAttachment } from './types';
+import { USER_DATA_DIR_NAME } from '../appConstants';
 import { fetchWithSystemProxy } from './http';
 
 // 常量
@@ -21,7 +22,7 @@ const INBOUND_DIR = 'telegram-inbound';
  * 获取媒体存储目录
  */
 export function getTelegramMediaDir(): string {
-  const userDataPath = app?.getPath('userData') ?? path.join(os.homedir(), '.lobsterai');
+  const userDataPath = app?.getPath('userData') ?? path.join(os.homedir(), USER_DATA_DIR_NAME);
   const mediaDir = path.join(userDataPath, INBOUND_DIR);
 
   if (!fs.existsSync(mediaDir)) {

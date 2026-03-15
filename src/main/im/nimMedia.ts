@@ -11,6 +11,7 @@ import * as https from 'https';
 import * as http from 'http';
 import * as os from 'os';
 import type { IMMediaAttachment, IMMediaType } from './types';
+import { USER_DATA_DIR_NAME } from '../appConstants';
 
 // Conditional Electron import for testability outside Electron
 let app: { getPath: (name: string) => string } | null = null;
@@ -30,7 +31,7 @@ const INBOUND_DIR = 'nim-inbound';
  * 获取 NIM 媒体文件存储目录
  */
 export function getNimMediaDir(): string {
-  const userDataPath = app?.getPath('userData') ?? path.join(os.homedir(), '.lobsterai');
+  const userDataPath = app?.getPath('userData') ?? path.join(os.homedir(), USER_DATA_DIR_NAME);
   const mediaDir = path.join(userDataPath, INBOUND_DIR);
 
   if (!fs.existsSync(mediaDir)) {
