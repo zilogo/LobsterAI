@@ -269,7 +269,6 @@ export const defaultConfig: AppConfig = {
       baseUrl: 'https://api.anthropic.com',
       apiFormat: 'anthropic',
       models: [
-        { id: 'claude-sonnet-4-5-20250929', name: 'Claude Sonnet 4.5', supportsImage: true },
         { id: 'claude-sonnet-4-6', name: 'Claude Sonnet 4.6', supportsImage: true },
         { id: 'claude-opus-4-6', name: 'Claude Opus 4.6', supportsImage: true }
       ]

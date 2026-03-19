@@ -43,3 +43,6 @@ nul
 
 # editorconfig files
 .vscode/
+
+CLAUDE.md
+AGENTS.md
