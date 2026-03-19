@@ -86,10 +86,15 @@ const App: React.FC = () => {
         // 标记平台，用于 CSS 条件样式（如 Windows 标题栏按钮区域留白）
         document.documentElement.classList.add(`platform-${window.electron.platform}`);
 
-        // 初始化配置
-        console.info('[App] initializeApp: configService.init');
-        await waitWithTimeout(configService.init(), 5000, 'configService.init');
-        
+        // 初始化配置 + 获取默认 API 信息（并行执行减少延迟）
+        console.info('[App] initializeApp: configService.init + getDefaultApiInfo');
+        const [, defaultApiInfo] = await Promise.all([
+          waitWithTimeout(configService.init(), 5000, 'configService.init'),
+          window.electron.getDefaultApiInfo?.()
+            .catch((err: any) => { console.warn('[App] getDefaultApiInfo failed:', err); return null; })
+            ?? Promise.resolve(null),
+        ]);
+
         // 初始化主题
         console.info('[App] initializeApp: themeService.initialize');
         themeService.initialize();
@@ -99,8 +104,22 @@ const App: React.FC = () => {
         await waitWithTimeout(i18nService.initialize(), 5000, 'i18nService.initialize');
         
         console.info('[App] initializeApp: configService.getConfig');
-        const config = await configService.getConfig();
-        
+        let config = configService.getConfig();
+
+        // 检查是否有用户自行配置的 provider（非 __DEFAULT__）
+        const hasUserProvider = config.providers
+          ? Object.values(config.providers).some(
+              (p) => p.enabled && p.apiKey && p.apiKey !== '__DEFAULT__'
+            )
+          : false;
+
+        // 无用户 provider 且默认 API 可用时，注入内存配置
+        if (!hasUserProvider && defaultApiInfo?.enabled) {
+          console.info('[App] initializeApp: injecting default API');
+          configService.injectDefaultApi(defaultApiInfo);
+          config = configService.getConfig();
+        }
+
         const apiConfig: ApiConfig = {
           apiKey: config.api.key,
           baseUrl: config.api.baseUrl,

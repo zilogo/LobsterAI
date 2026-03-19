@@ -12,6 +12,7 @@ import { IMGatewayManager, IMPlatform, IMGatewayConfig } from '../../main/im';
 import { APP_NAME, DB_FILENAME } from '../../main/appConstants';
 import { setStoreGetter } from '../../main/libs/claudeSettings';
 import { setScheduledTaskDeps, startCoworkOpenAICompatProxy } from '../../main/libs/coworkOpenAICompatProxy';
+import { getDefaultApiConfig } from '../../main/libs/defaultApiConfig';
 import { broadcast } from '../ws';
 
 /**
@@ -165,13 +166,23 @@ export function getIMGatewayManager(): IMGatewayManager {
     imGatewayManager.initialize({
       getLLMConfig: async () => {
         const appConfig = sqliteStore.get<any>('app_config');
-        if (!appConfig) return null;
-        const providers = appConfig.providers || {};
+        const providers = appConfig?.providers || {};
         for (const [providerName, providerConfig] of Object.entries(providers) as [string, any][]) {
-          if (providerConfig.enabled && providerConfig.apiKey) {
+          if (providerConfig.enabled && providerConfig.apiKey && providerConfig.apiKey !== '__DEFAULT__') {
             const model = providerConfig.models?.[0]?.id;
             return { apiKey: providerConfig.apiKey, baseUrl: providerConfig.baseUrl, model, provider: providerName };
           }
+        }
+        // 回退到默认 API 配置
+        const defaultApi = getDefaultApiConfig();
+        if (defaultApi) {
+          return {
+            apiKey: defaultApi.apiKey,
+            baseUrl: defaultApi.baseUrl,
+            model: defaultApi.defaultModel,
+            provider: 'anthropic',
+            apiFormat: defaultApi.apiFormat,
+          };
         }
         return null;
       },

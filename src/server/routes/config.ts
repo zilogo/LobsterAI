@@ -3,6 +3,7 @@ import { getStore, getCoworkStore } from '../services/init';
 import { getCurrentApiConfig, resolveCurrentApiConfig } from '../../main/libs/claudeSettings';
 import { saveCoworkApiConfig } from '../../main/libs/coworkConfigStore';
 import { generateSessionTitle, probeCoworkModelReadiness } from '../../main/libs/coworkUtil';
+import { getDefaultApiPublicInfo } from '../../main/libs/defaultApiConfig';
 
 export const configRouter = Router();
 
@@ -50,6 +51,16 @@ configRouter.post('/session-title', async (req, res) => {
     const { userInput } = req.body;
     const title = await generateSessionTitle(userInput);
     res.json({ title });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// GET /api/config/default-api — 获取默认 API 公开信息（无 Key）
+configRouter.get('/default-api', (_req, res) => {
+  try {
+    const info = getDefaultApiPublicInfo();
+    res.json({ defaultApi: info });
   } catch (error: any) {
     res.status(500).json({ success: false, error: error.message });
   }

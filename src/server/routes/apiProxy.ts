@@ -3,8 +3,31 @@ import http from 'http';
 import https from 'https';
 import { URL } from 'url';
 import { broadcast } from '../ws';
+import { isDefaultApiKeyPlaceholder, resolveDefaultApiKey } from '../../main/libs/defaultApiConfig';
 
 export const apiProxyRouter = Router();
+
+/**
+ * 将请求头中的 __DEFAULT__ 占位符替换为真实 API Key。
+ * 返回新 headers 对象（不修改原对象）。
+ */
+function resolveDefaultApiHeaders(headers: Record<string, string>): Record<string, string> {
+  const resolved = { ...headers };
+
+  // Anthropic native: x-api-key: __DEFAULT__
+  if (isDefaultApiKeyPlaceholder(resolved['x-api-key'])) {
+    resolved['x-api-key'] = resolveDefaultApiKey(resolved['x-api-key']);
+  }
+
+  // OpenAI compatible: Authorization: Bearer __DEFAULT__
+  for (const key of ['Authorization', 'authorization'] as const) {
+    if (resolved[key] === 'Bearer __DEFAULT__') {
+      resolved[key] = `Bearer ${resolveDefaultApiKey('__DEFAULT__')}`;
+    }
+  }
+
+  return resolved;
+}
 
 // 存储活跃的流式请求 controller
 const activeStreamControllers = new Map<string, AbortController>();
@@ -13,10 +36,11 @@ const activeStreamControllers = new Map<string, AbortController>();
 apiProxyRouter.post('/fetch', async (req, res) => {
   try {
     const { url, method, headers, body } = req.body;
+    const resolvedHeaders = resolveDefaultApiHeaders(headers || {});
 
     const response = await fetch(url, {
       method,
-      headers,
+      headers: resolvedHeaders,
       body: body || undefined,
     });
 
@@ -63,9 +87,10 @@ apiProxyRouter.post('/stream', async (req, res) => {
   activeStreamControllers.set(requestId, controller);
 
   try {
+    const resolvedHeaders = resolveDefaultApiHeaders(headers || {});
     const response = await fetch(url, {
       method,
-      headers,
+      headers: resolvedHeaders,
       body: body || undefined,
       signal: controller.signal,
     });

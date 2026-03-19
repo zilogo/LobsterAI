@@ -1102,7 +1102,8 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, onUpda
   const toggleProviderEnabled = (provider: ProviderType) => {
     const providerConfig = providers[provider];
     const isEnabling = !providerConfig.enabled;
-    const missingApiKey = providerRequiresApiKey(provider) && !providerConfig.apiKey.trim();
+    const isDefaultApi = providerConfig.apiKey === '__DEFAULT__';
+    const missingApiKey = providerRequiresApiKey(provider) && !isDefaultApi && !providerConfig.apiKey.trim();
 
     if (isEnabling && missingApiKey) {
       setError(i18nService.t('apiKeyRequired'));
@@ -1812,7 +1813,8 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, onUpda
     { key: 'im',             label: i18nService.t('imBot'),          icon: <ChatBubbleLeftIcon className="h-5 w-5" /> },
     { key: 'email',          label: i18nService.t('emailTab'),       icon: <EnvelopeIcon className="h-5 w-5" /> },
     { key: 'coworkMemory',   label: i18nService.t('coworkMemoryTitle'), icon: <BrainIcon className="h-5 w-5" /> },
-    { key: 'coworkSandbox',  label: i18nService.t('coworkSandbox'),  icon: <ShieldCheckIcon className="h-5 w-5" /> },
+    // [rebrand] 沙箱功能暂时屏蔽，开源版本不展示
+    // { key: 'coworkSandbox',  label: i18nService.t('coworkSandbox'),  icon: <ShieldCheckIcon className="h-5 w-5" /> },
     { key: 'shortcuts',      label: i18nService.t('shortcuts'),      icon: <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="h-5 w-5"><rect x="2" y="4" width="20" height="14" rx="2" /><line x1="6" y1="8" x2="8" y2="8" /><line x1="10" y1="8" x2="12" y2="8" /><line x1="14" y1="8" x2="16" y2="8" /><line x1="6" y1="12" x2="8" y2="12" /><line x1="10" y1="12" x2="14" y2="12" /><line x1="16" y1="12" x2="18" y2="12" /><line x1="8" y1="15.5" x2="16" y2="15.5" /></svg> },
     { key: 'about',          label: i18nService.t('about'),          icon: <InformationCircleIcon className="h-5 w-5" /> },
   ], [language]);
@@ -2330,6 +2332,7 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, onUpda
               {Object.entries(visibleProviders).map(([provider, config]) => {
                 const providerKey = provider as ProviderType;
                 const providerInfo = providerMeta[providerKey];
+                const isDefaultApi = config.apiKey === '__DEFAULT__';
                 const missingApiKey = providerRequiresApiKey(providerKey) && !config.apiKey.trim();
                 const canToggleProvider = config.enabled || !missingApiKey;
                 return (
@@ -2355,6 +2358,11 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, onUpda
                       }`}>
                         {providerInfo?.label ?? provider.charAt(0).toUpperCase() + provider.slice(1)}
                       </span>
+                      {isDefaultApi && config.enabled && (
+                        <span className="ml-1.5 inline-flex items-center px-1.5 py-0.5 rounded-md text-[10px] font-medium bg-claude-accent/15 text-claude-accent">
+                          {i18nService.t('defaultApiActive')}
+                        </span>
+                      )}
                     </div>
                     <div className="flex items-center ml-2">
                       <div
@@ -2401,6 +2409,31 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, onUpda
                 </div>
               </div>
 
+              {/* 默认 API 激活提示 */}
+              {providers[activeProvider].apiKey === '__DEFAULT__' && (
+                <div className="p-3 rounded-xl bg-claude-accent/10 border border-claude-accent/20">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center space-x-2">
+                      <CheckCircleIcon className="h-4 w-4 text-claude-accent" />
+                      <span className="text-xs font-medium text-claude-accent">{i18nService.t('defaultApiActive')}</span>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        handleProviderConfigChange(activeProvider, 'apiKey', '');
+                        handleProviderConfigChange(activeProvider, 'baseUrl', defaultConfig.providers?.[activeProvider]?.baseUrl || '');
+                      }}
+                      className="px-2.5 py-1 text-[11px] font-medium rounded-lg border border-claude-accent/30 text-claude-accent hover:bg-claude-accent/10 transition-colors"
+                    >
+                      {i18nService.t('customizeConfig')}
+                    </button>
+                  </div>
+                  <p className="mt-1 text-[11px] dark:text-claude-darkTextSecondary text-claude-textSecondary">
+                    {i18nService.t('defaultApiHint')}
+                  </p>
+                </div>
+              )}
+
               {providerRequiresApiKey(activeProvider) && (
                 <div>
                   <label htmlFor={`${activeProvider}-apiKey`} className="block text-xs font-medium dark:text-claude-darkText text-claude-text mb-1">
@@ -2410,13 +2443,14 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, onUpda
                     <input
                       type={showApiKey ? 'text' : 'password'}
                       id={`${activeProvider}-apiKey`}
-                      value={providers[activeProvider].apiKey}
+                      value={providers[activeProvider].apiKey === '__DEFAULT__' ? '' : providers[activeProvider].apiKey}
                       onChange={(e) => handleProviderConfigChange(activeProvider, 'apiKey', e.target.value)}
-                      className="block w-full rounded-xl bg-claude-surfaceInset dark:bg-claude-darkSurfaceInset dark:border-claude-darkBorder border-claude-border border focus:border-claude-accent focus:ring-1 focus:ring-claude-accent/30 dark:text-claude-darkText text-claude-text px-3 py-2 pr-16 text-xs"
-                      placeholder={i18nService.t('apiKeyPlaceholder')}
+                      readOnly={providers[activeProvider].apiKey === '__DEFAULT__'}
+                      className={`block w-full rounded-xl bg-claude-surfaceInset dark:bg-claude-darkSurfaceInset dark:border-claude-darkBorder border-claude-border border focus:border-claude-accent focus:ring-1 focus:ring-claude-accent/30 dark:text-claude-darkText text-claude-text px-3 py-2 pr-16 text-xs ${providers[activeProvider].apiKey === '__DEFAULT__' ? 'opacity-50 cursor-not-allowed' : ''}`}
+                      placeholder={providers[activeProvider].apiKey === '__DEFAULT__' ? i18nService.t('usingDefaultApi') : i18nService.t('apiKeyPlaceholder')}
                     />
                     <div className="absolute right-2 inset-y-0 flex items-center gap-1">
-                      {providers[activeProvider].apiKey && (
+                      {providers[activeProvider].apiKey && providers[activeProvider].apiKey !== '__DEFAULT__' && (
                         <button
                           type="button"
                           onClick={() => handleProviderConfigChange(activeProvider, 'apiKey', '')}
@@ -2426,14 +2460,16 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, onUpda
                           <XCircleIconSolid className="h-4 w-4" />
                         </button>
                       )}
-                      <button
-                        type="button"
-                        onClick={() => setShowApiKey(!showApiKey)}
-                        className="p-0.5 rounded text-claude-textSecondary dark:text-claude-darkTextSecondary hover:text-claude-accent transition-colors"
-                        title={showApiKey ? (i18nService.t('hide') || 'Hide') : (i18nService.t('show') || 'Show')}
-                      >
-                        {showApiKey ? <EyeIcon className="h-4 w-4" /> : <EyeSlashIcon className="h-4 w-4" />}
-                      </button>
+                      {providers[activeProvider].apiKey !== '__DEFAULT__' && (
+                        <button
+                          type="button"
+                          onClick={() => setShowApiKey(!showApiKey)}
+                          className="p-0.5 rounded text-claude-textSecondary dark:text-claude-darkTextSecondary hover:text-claude-accent transition-colors"
+                          title={showApiKey ? (i18nService.t('hide') || 'Hide') : (i18nService.t('show') || 'Show')}
+                        >
+                          {showApiKey ? <EyeIcon className="h-4 w-4" /> : <EyeSlashIcon className="h-4 w-4" />}
+                        </button>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -2467,8 +2503,8 @@ const Settings: React.FC<SettingsProps> = ({ onClose, initialTab, notice, onUpda
                               : providers[activeProvider].baseUrl
                     }
                     onChange={(e) => handleProviderConfigChange(activeProvider, 'baseUrl', e.target.value)}
-                    disabled={isBaseUrlLocked}
-                    className={`block w-full rounded-xl bg-claude-surfaceInset dark:bg-claude-darkSurfaceInset dark:border-claude-darkBorder border-claude-border border focus:border-claude-accent focus:ring-1 focus:ring-claude-accent/30 dark:text-claude-darkText text-claude-text px-3 py-2 pr-8 text-xs ${isBaseUrlLocked ? 'opacity-50 cursor-not-allowed' : ''}`}
+                    disabled={isBaseUrlLocked || providers[activeProvider].apiKey === '__DEFAULT__'}
+                    className={`block w-full rounded-xl bg-claude-surfaceInset dark:bg-claude-darkSurfaceInset dark:border-claude-darkBorder border-claude-border border focus:border-claude-accent focus:ring-1 focus:ring-claude-accent/30 dark:text-claude-darkText text-claude-text px-3 py-2 pr-8 text-xs ${isBaseUrlLocked || providers[activeProvider].apiKey === '__DEFAULT__' ? 'opacity-50 cursor-not-allowed' : ''}`}
                     placeholder={getProviderDefaultBaseUrl(activeProvider, getEffectiveApiFormat(activeProvider, providers[activeProvider].apiFormat)) || defaultConfig.providers?.[activeProvider]?.baseUrl || i18nService.t('baseUrlPlaceholder')}
                   />
                   {providers[activeProvider].baseUrl && !isBaseUrlLocked && (

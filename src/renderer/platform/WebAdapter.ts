@@ -548,4 +548,8 @@ export class WebAdapter implements IPlatformAdapter {
       this.wsManager.send({ type: 'network:status', status: _status });
     },
   };
+
+  // ==================== Default API Info (Web 模式独有) ====================
+  getDefaultApiInfo = () =>
+    apiFetch('/config/default-api').then((r) => r.defaultApi ?? null);
 }

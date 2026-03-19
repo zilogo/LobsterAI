@@ -11,6 +11,7 @@ import {
   getCoworkOpenAICompatProxyStatus,
 } from './coworkOpenAICompatProxy';
 import { normalizeProviderApiFormat, type AnthropicApiFormat } from './coworkFormatTransform';
+import { getDefaultApiConfig, isDefaultApiKeyPlaceholder, resolveDefaultApiKey } from './defaultApiConfig';
 
 const ZHIPU_CODING_PLAN_BASE_URL = 'https://open.bigmodel.cn/api/coding/paas/v4';
 // Qwen Coding Plan 专属端点 (OpenAI 兼容和 Anthropic 兼容)
@@ -145,6 +146,29 @@ function resolveMatchedProvider(appConfig: AppConfig): { matched: MatchedProvide
   }
 
   if (!providerEntry) {
+    // 回退到默认 API 配置
+    const defaultApi = getDefaultApiConfig();
+    if (defaultApi) {
+      const hasModel = defaultApi.models.some((m) => m.id === modelId);
+      const fallbackModelId = hasModel ? modelId : defaultApi.defaultModel;
+      if (fallbackModelId) {
+        return {
+          matched: {
+            providerName: 'anthropic',
+            providerConfig: {
+              enabled: true,
+              apiKey: defaultApi.apiKey,
+              baseUrl: defaultApi.baseUrl,
+              apiFormat: defaultApi.apiFormat,
+              models: defaultApi.models.map((m) => ({ id: m.id })),
+            },
+            modelId: fallbackModelId,
+            apiFormat: defaultApi.apiFormat,
+            baseURL: defaultApi.baseUrl,
+          },
+        };
+      }
+    }
     return { matched: null, error: `No enabled provider found for model: ${modelId}` };
   }
 
@@ -221,6 +245,18 @@ export function resolveCurrentApiConfig(target: OpenAICompatProxyTarget = 'local
 
   const appConfig = sqliteStore.get<AppConfig>('app_config');
   if (!appConfig) {
+    // 无用户配置时回退到默认 API
+    const defaultApi = getDefaultApiConfig();
+    if (defaultApi) {
+      return {
+        config: {
+          apiKey: defaultApi.apiKey,
+          baseURL: defaultApi.baseUrl,
+          model: defaultApi.defaultModel,
+          apiType: defaultApi.apiFormat === 'openai' ? 'openai' : 'anthropic',
+        },
+      };
+    }
     return {
       config: null,
       error: 'Application config not found.',
@@ -236,7 +272,9 @@ export function resolveCurrentApiConfig(target: OpenAICompatProxyTarget = 'local
   }
 
   const resolvedBaseURL = matched.baseURL;
-  const resolvedApiKey = matched.providerConfig.apiKey?.trim() || '';
+  const rawApiKey = matched.providerConfig.apiKey?.trim() || '';
+  // 将 __DEFAULT__ 占位符替换为真实 Key
+  const resolvedApiKey = isDefaultApiKeyPlaceholder(rawApiKey) ? resolveDefaultApiKey(rawApiKey) : rawApiKey;
   const effectiveApiKey = matched.providerName === 'ollama'
     && matched.apiFormat === 'anthropic'
     && !resolvedApiKey

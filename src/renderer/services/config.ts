@@ -66,6 +66,17 @@ const normalizeProvidersConfig = (providers: AppConfig['providers']): AppConfig[
   ) as AppConfig['providers'];
 };
 
+const DEFAULT_API_KEY_PLACEHOLDER = '__DEFAULT__';
+
+export interface DefaultApiInfo {
+  enabled: boolean;
+  baseUrl: string;
+  models: Array<{ id: string; name: string; supportsImage?: boolean }>;
+  defaultModel: string;
+  apiFormat: 'anthropic' | 'openai';
+  providerName: string;
+}
+
 class ConfigService {
   private config: AppConfig = defaultConfig;
 
@@ -126,14 +137,67 @@ class ConfigService {
     return this.config;
   }
 
+  /**
+   * 注入默认 API 到内存配置（不持久化）。
+   * 将 anthropic provider 设置为 enabled，apiKey='__DEFAULT__'，
+   * models 和 baseUrl 从服务端 info 获取。
+   */
+  injectDefaultApi(info: DefaultApiInfo): void {
+    if (!info.enabled || !this.config.providers) return;
+
+    const providerKey = info.providerName || 'anthropic';
+    const existing = this.config.providers[providerKey];
+    if (!existing) return;
+
+    this.config = {
+      ...this.config,
+      providers: {
+        ...this.config.providers,
+        [providerKey]: {
+          ...existing,
+          enabled: true,
+          apiKey: DEFAULT_API_KEY_PLACEHOLDER,
+          baseUrl: info.baseUrl,
+          apiFormat: info.apiFormat,
+          models: info.models.map((m) => ({
+            id: m.id,
+            name: m.name,
+            supportsImage: m.supportsImage,
+          })),
+        },
+      },
+      model: {
+        ...this.config.model,
+        defaultModel: info.defaultModel,
+        defaultModelProvider: providerKey,
+      },
+    };
+  }
+
   async updateConfig(newConfig: Partial<AppConfig>) {
     const normalizedProviders = normalizeProvidersConfig(newConfig.providers as AppConfig['providers'] | undefined);
+
+    // 更新内存配置（保留 __DEFAULT__ 占位符，仅在持久化时过滤）
     this.config = {
       ...this.config,
       ...newConfig,
       ...(normalizedProviders ? { providers: normalizedProviders } : {}),
     };
-    await localStore.setItem(CONFIG_KEYS.APP_CONFIG, this.config);
+
+    // 持久化时过滤 __DEFAULT__，防止占位符泄漏到 SQLite
+    const configToStore = { ...this.config };
+    if (configToStore.providers) {
+      configToStore.providers = Object.fromEntries(
+        Object.entries(configToStore.providers).map(([key, config]) => [
+          key,
+          {
+            ...config,
+            apiKey: config.apiKey === DEFAULT_API_KEY_PLACEHOLDER ? '' : config.apiKey,
+          },
+        ])
+      ) as AppConfig['providers'];
+    }
+    await localStore.setItem(CONFIG_KEYS.APP_CONFIG, configToStore);
   }
 
   getApiConfig() {

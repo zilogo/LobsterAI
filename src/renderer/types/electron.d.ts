@@ -430,6 +430,16 @@ interface IElectronAPI {
   networkStatus: {
     send: (status: 'online' | 'offline') => void;
   };
+
+  /** 获取服务端默认 API 信息（仅 Web 模式实现） */
+  getDefaultApiInfo?: () => Promise<{
+    enabled: boolean;
+    baseUrl: string;
+    models: Array<{ id: string; name: string; supportsImage?: boolean }>;
+    defaultModel: string;
+    apiFormat: 'anthropic' | 'openai';
+    providerName: string;
+  } | null>;
 }
 
 // IM Gateway types
